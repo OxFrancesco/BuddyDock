@@ -1,0 +1,32 @@
+{
+  "name": "buddydock",
+  "version": "0.1.0",
+  "description": "Restyle macOS Dock icons with Effect and fal.ai",
+  "type": "module",
+  "bin": {
+    "buddydock": "./src/cli.ts"
+  },
+  "scripts": {
+    "buddydock": "bun run src/cli.ts",
+    "build:native": "mkdir -p dist && swiftc -O native/DockInspector.swift -o dist/buddydock-inspector",
+    "build:cli": "bun build src/cli.ts --target=bun --outfile=dist/buddydock.js",
+    "build": "rm -rf dist && bun run build:native && bun run build:cli",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ./test/style.test.ts",
+    "check": "bun run typecheck && bun run test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "latest"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "dependencies": {
+    "@effect/cli": "^0.75.2",
+    "@effect/platform-bun": "^0.90.0",
+    "@fal-ai/client": "^1.10.1",
+    "effect": "^3.21.4"
+  },
+  "keywords": ["macos", "dock", "icons", "effect", "fal-ai"]
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+resources/
+.buddydock/
+styled-icons/
+*.log
+.DS_Store
