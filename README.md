@@ -53,6 +53,40 @@ For a cheap one-icon smoke test, add `--limit 1 --quality low`. Add `--keep-back
 
 Generated icons include a second manifest recording source paths, theme, and model IDs. BuddyDock processes sequentially to keep cost and rate behavior predictable.
 
+## Claymation icon pack
+
+The repository includes a ready-to-use black-and-white claymation pack in
+`icon-packs/claymation-black-white`. Its `.icns` filenames match the corresponding
+application bundle names exactly.
+
+Install `fileicon`, then apply the whole pack:
+
+```sh
+brew install fileicon
+./scripts/apply-icon-pack.sh ./icon-packs/claymation-black-white
+```
+
+The script asks for your administrator password once when targeting `/Applications`.
+To regenerate the pack from its source PNGs, use the macOS-provided `sips` and
+`iconutil` tools:
+
+```sh
+./scripts/build-icon-pack.sh \
+  ./styled-icons/claymation-black-white \
+  ./icon-packs/claymation-black-white \
+  ./icon-packs/claymation-black-white/manifest.tsv
+```
+
+Restore the original icons later with:
+
+```sh
+./scripts/restore-icon-pack.sh ./icon-packs/claymation-black-white
+```
+
+If macOS rejects an app, enable the terminal you are using under **System Settings →
+Privacy & Security → App Management**, quit and reopen it, and rerun the script.
+The scripts refresh only applications represented in the pack.
+
 ## Development
 
 ```sh
