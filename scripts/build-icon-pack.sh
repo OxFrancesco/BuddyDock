@@ -2,15 +2,21 @@
 
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$script_dir/icon-pack-common.sh"
+
 if [[ $# -ne 3 ]]; then
   echo "Usage: $0 <png-directory> <pack-directory> <manifest.tsv>" >&2
   exit 64
 fi
 
-source_dir="${1%/}"
-pack_dir="${2%/}"
-manifest_path="$3"
+source_dir="$(cd "${1%/}" && pwd)"
+manifest_path="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
+mkdir -p "${2%/}"
+pack_dir="$(cd "${2%/}" && pwd)"
 work_dir="$(mktemp -d)"
+built_dir="$work_dir/pack"
 trap 'rm -rf "$work_dir"' EXIT
 
 declare -a slot_names=(
@@ -27,10 +33,20 @@ if [[ ! -f "$manifest_path" ]]; then
   exit 66
 fi
 
-mkdir -p "$pack_dir"
+mkdir -p "$built_dir"
 
-while IFS=$'\t' read -r source_name app_name; do
+while IFS=$'\t' read -r source_name app_name apply_method extra; do
   [[ -n "$source_name" && "${source_name:0:1}" != "#" ]] || continue
+
+  apply_method="${apply_method:-fileicon}"
+  if [[ -n "${extra:-}" || -z "$app_name" ]]; then
+    echo "Invalid manifest row for $source_name" >&2
+    exit 65
+  fi
+  if ! buddy_apply_method_is_supported "$apply_method"; then
+    echo "Unsupported apply method '$apply_method' for $app_name" >&2
+    exit 65
+  fi
 
   source_path="$source_dir/$source_name"
   iconset="$work_dir/$app_name.iconset"
@@ -46,6 +62,15 @@ while IFS=$'\t' read -r source_name app_name; do
     sips -z "$size" "$size" "$source_path" --out "$iconset/${slot_names[$index]}" >/dev/null
   done
 
-  iconutil -c icns "$iconset" -o "$pack_dir/$app_name.icns"
+  iconutil -c icns "$iconset" -o "$built_dir/$app_name.icns"
   echo "Built $app_name.icns"
 done < "$manifest_path"
+
+# Install only after every manifest row validates and every icon builds. The
+# manifest moves last so apply/restore never observe new metadata for old icons.
+for icon_file in "$built_dir"/*.icns; do
+  cp "$icon_file" "$pack_dir/$(basename "$icon_file")"
+done
+manifest_temp="$(mktemp "$pack_dir/.manifest.tsv.XXXXXX")"
+cp "$manifest_path" "$manifest_temp"
+mv "$manifest_temp" "$pack_dir/manifest.tsv"
