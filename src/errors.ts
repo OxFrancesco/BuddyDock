@@ -20,3 +20,8 @@ export class FalError extends Data.TaggedError("FalError")<{
   readonly message: string
   readonly cause?: unknown
 }> {}
+
+export class IconPackError extends Data.TaggedError("IconPackError")<{
+  readonly message: string
+  readonly cause?: unknown
+}> {}

@@ -12,7 +12,7 @@
     "build:cli": "bun build src/cli.ts --target=bun --outfile=dist/buddydock.js",
     "build": "rm -rf dist && bun run build:native && bun run build:cli",
     "typecheck": "tsc --noEmit",
-    "test": "bun test ./test/style.test.ts",
+    "test": "bun test ./test",
     "check": "bun run typecheck && bun run test"
   },
   "devDependencies": {

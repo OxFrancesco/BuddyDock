@@ -6,6 +6,7 @@ import { Console, Effect, Option } from "effect"
 import { applyManifest } from "./apply.ts"
 import { scanDock } from "./dock.ts"
 import { FalGateway } from "./fal.ts"
+import { defaultIconPackDirectory, reapplyIconPack } from "./icon-pack.ts"
 import { styleManifest } from "./style.ts"
 
 const output = Options.directory("output").pipe(Options.withAlias("o"))
@@ -16,6 +17,15 @@ const quality = Options.choice("quality", ["low", "medium", "high"] as const).pi
 const removeBackground = Options.boolean("remove-background")
 const limit = Options.integer("limit").pipe(Options.optional)
 const resume = Options.boolean("resume").pipe(Options.withDescription("Reuse icons already present in the output directory instead of regenerating them"))
+const pack = Options.directory("pack").pipe(
+  Options.withAlias("p"),
+  Options.withDefault(defaultIconPackDirectory)
+)
+const applicationsDirectory = Options.directory("applications-directory").pipe(
+  Options.withAlias("a"),
+  Options.withDefault("/Applications")
+)
+const useSudo = Options.boolean("sudo")
 
 const scan = Command.make("scan", { output: scanOutput }, ({ output }) =>
   scanDock(output).pipe(
@@ -90,9 +100,21 @@ const reset = Command.make("reset", { manifest: styledManifest, noRestart, relau
   )
 ).pipe(Command.withDescription("Remove custom icons from the apps in a manifest, restoring the originals"))
 
+const reapply = Command.make("reapply", {
+  pack,
+  applicationsDirectory,
+  useSudo
+}, ({ pack, applicationsDirectory, useSudo }) =>
+  reapplyIconPack({
+    packDirectory: pack,
+    applicationsDirectory,
+    useSudo
+  })
+).pipe(Command.withDescription("Reapply a saved icon pack and refresh the Dock"))
+
 const root = Command.make("buddydock").pipe(
   Command.withDescription("Create cohesive, AI-styled versions of your macOS Dock icons"),
-  Command.withSubcommands([scan, style, run, apply, reset])
+  Command.withSubcommands([scan, style, run, apply, reset, reapply])
 )
 
 const cli = Command.run(root, { name: "BuddyDock", version: "0.1.0" })
