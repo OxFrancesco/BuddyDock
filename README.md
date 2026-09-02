@@ -2,7 +2,7 @@
 
 BuddyDock is a macOS CLI that exports the pinned icons in your Dock and creates a cohesive styled set with fal.ai. It is built with Bun, Effect, `@effect/cli`, a native Swift/AppKit inspector, GPT Image 2 edit, and BiRefNet background removal.
 
-It only creates exported PNG files. It does not modify app bundles or apply icons to your Mac.
+Styling only creates exported PNG files. The optional `apply` command then sets them as custom Finder icons on the app bundles (the same mechanism as Get Info > drag icon), and `reset` restores the originals. App updates will overwrite custom icons.
 
 ## Requirements
 
@@ -45,11 +45,20 @@ doppler run -- bun run buddydock run --theme "candy cotton" --quality medium
 
 For a cheap one-icon smoke test, add `--limit 1 --quality low`. Add `--keep-background` to skip BiRefNet.
 
+Apply a styled set to your Dock (restarts the Dock), or undo it:
+
+```sh
+bun run buddydock apply --manifest styled-icons/manifest.json
+bun run buddydock reset --manifest styled-icons/manifest.json
+```
+
 ## Commands
 
 - `scan`: reads `com.apple.dock` and exports each pinned app icon plus `manifest.json`.
 - `style`: styles the icons in an existing scan manifest.
 - `run`: scans and styles in one pass.
+- `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip).
+- `reset`: removes the custom icons for the apps in a styled manifest.
 
 Generated icons include a second manifest recording source paths, theme, and model IDs. BuddyDock processes sequentially to keep cost and rate behavior predictable.
 

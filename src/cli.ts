@@ -3,6 +3,7 @@
 import { Command, Options } from "@effect/cli"
 import { BunContext, BunRuntime } from "@effect/platform-bun"
 import { Console, Effect, Option } from "effect"
+import { applyManifest } from "./apply.ts"
 import { scanDock } from "./dock.ts"
 import { FalGateway } from "./fal.ts"
 import { styleManifest } from "./style.ts"
@@ -65,9 +66,29 @@ const run = Command.make("run", {
   })
 ).pipe(Command.withDescription("Scan the Dock and style its icons in one command"))
 
+const styledManifest = Options.file("manifest").pipe(Options.withAlias("m"), Options.withDefault("styled-icons/manifest.json"))
+const noRestart = Options.boolean("no-restart")
+
+const summarize = (label: string) => (results: ReadonlyArray<{ applied: boolean }>) =>
+  Console.log(`${label} ${results.filter((r) => r.applied).length}/${results.length} app icons`)
+
+const apply = Command.make("apply", { manifest: styledManifest, noRestart }, ({ manifest, noRestart }) =>
+  applyManifest({ manifestPath: manifest, reset: false, restartDock: !noRestart }).pipe(
+    Effect.flatMap(summarize("Applied")),
+    Effect.asVoid
+  )
+).pipe(Command.withDescription("Set the styled icons from a manifest as custom icons on the Dock apps"))
+
+const reset = Command.make("reset", { manifest: styledManifest, noRestart }, ({ manifest, noRestart }) =>
+  applyManifest({ manifestPath: manifest, reset: true, restartDock: !noRestart }).pipe(
+    Effect.flatMap(summarize("Restored")),
+    Effect.asVoid
+  )
+).pipe(Command.withDescription("Remove custom icons from the apps in a manifest, restoring the originals"))
+
 const root = Command.make("buddydock").pipe(
   Command.withDescription("Create cohesive, AI-styled versions of your macOS Dock icons"),
-  Command.withSubcommands([scan, style, run])
+  Command.withSubcommands([scan, style, run, apply, reset])
 )
 
 const cli = Command.run(root, { name: "BuddyDock", version: "0.1.0" })

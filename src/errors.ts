@@ -5,6 +5,11 @@ export class DockScanError extends Data.TaggedError("DockScanError")<{
   readonly cause?: unknown
 }> {}
 
+export class DockApplyError extends Data.TaggedError("DockApplyError")<{
+  readonly message: string
+  readonly cause?: unknown
+}> {}
+
 export class ManifestError extends Data.TaggedError("ManifestError")<{
   readonly message: string
   readonly cause?: unknown
