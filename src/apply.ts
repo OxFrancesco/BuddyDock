@@ -18,6 +18,7 @@ export interface ApplyOptions {
   readonly reset: boolean
   readonly restartDock: boolean
   readonly relaunch: boolean
+  readonly onlyMissing?: boolean
 }
 
 const resolveApplier = Effect.promise(async () => {
@@ -26,7 +27,7 @@ const resolveApplier = Effect.promise(async () => {
   return await Bun.file(compiled).exists() ? [compiled] : ["swift", source]
 })
 
-const runApplier = (mode: "apply" | "reset", requests: ReadonlyArray<{ appPath: string; iconPath: string | null }>) =>
+const runApplier = (mode: "apply" | "apply-missing" | "reset", requests: ReadonlyArray<{ appPath: string; iconPath: string | null }>) =>
   Effect.gen(function*() {
     const applier = yield* resolveApplier
     const stdout = yield* Effect.tryPromise({
@@ -85,7 +86,7 @@ export const applyManifest = (options: ApplyOptions) =>
     const isGhostty = (icon: { bundleIdentifier: string | null }) => icon.bundleIdentifier === GHOSTTY_BUNDLE_ID
 
     const finderIcons = manifest.icons.filter((icon) => !isGhostty(icon))
-    const finderResults = yield* runApplier(options.reset ? "reset" : "apply", finderIcons.map((icon) => ({
+    const finderResults = yield* runApplier(options.reset ? "reset" : options.onlyMissing ? "apply-missing" : "apply", finderIcons.map((icon) => ({
       appPath: icon.appPath,
       iconPath: options.reset ? null : absolute(icon.styledIconPath)
     })))
@@ -104,7 +105,7 @@ export const applyManifest = (options: ApplyOptions) =>
       (icon) =>
         (options.reset
           ? resetRuntimeIconResources(icon.appPath, icon.bundleIdentifier!)
-          : applyRuntimeIconResources(icon.appPath, icon.bundleIdentifier!, absolute(icon.styledIconPath))).pipe(
+          : applyRuntimeIconResources(icon.appPath, icon.bundleIdentifier!, absolute(icon.styledIconPath), options.onlyMissing ?? false)).pipe(
             Effect.map((files) => [icon.appPath, `${options.reset ? "restored" : "patched"} ${files.length} bundle resource(s)`] as const),
             Effect.catchAll((e) => Effect.succeed([icon.appPath, e.message] as const))
           )

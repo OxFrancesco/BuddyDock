@@ -57,6 +57,7 @@ export const agentPlist = (options: {
     <string>apply</string>
     <string>--manifest</string>
     <string>${xml(options.manifest)}</string>
+    <string>--only-missing</string>
   </array>
   <key>WatchPaths</key>
   <array>

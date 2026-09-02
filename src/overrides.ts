@@ -18,7 +18,7 @@ const backupDirectory = (bundleIdentifier: string) =>
 
 const fail = (message: string) => (cause: unknown) => new DockApplyError({ message, cause })
 
-export const applyRuntimeIconResources = (appPath: string, bundleIdentifier: string, iconPath: string) =>
+export const applyRuntimeIconResources = (appPath: string, bundleIdentifier: string, iconPath: string, onlyMissing = false) =>
   Effect.tryPromise({
     try: async () => {
       const backups = backupDirectory(bundleIdentifier)
@@ -27,6 +27,7 @@ export const applyRuntimeIconResources = (appPath: string, bundleIdentifier: str
       for (const relative of RUNTIME_ICON_RESOURCES[bundleIdentifier] ?? []) {
         const target = `${appPath}/${relative}`
         if (!(await Bun.file(target).exists())) continue
+        if (onlyMissing && Buffer.from(await Bun.file(target).arrayBuffer()).equals(Buffer.from(await Bun.file(iconPath).arrayBuffer()))) continue
         const backup = `${backups}/${relative.replaceAll("/", "__")}`
         if (!(await Bun.file(backup).exists())) await Bun.write(backup, Bun.file(target))
         await Bun.write(target, Bun.file(iconPath))

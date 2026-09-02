@@ -47,6 +47,10 @@ export const applyGhosttyIcon = (packName: string, iconPath: string) =>
 
       await Bun.$`mkdir -p ${`${directory}/icons`} ${`${directory}/buddydock`}`.quiet()
       const lines = await readLines(config)
+      const desired = `macos-custom-icon = ${installedIcon}`
+      const installedMatches = await Bun.file(installedIcon).exists()
+        && Buffer.from(await Bun.file(installedIcon).arrayBuffer()).equals(Buffer.from(await Bun.file(iconPath).arrayBuffer()))
+      if (installedMatches && lines.some((l) => l.trim() === "macos-icon = custom") && lines.some((l) => l.trim() === desired)) return config
       if (!(await Bun.file(stateFile).exists())) {
         await Bun.write(stateFile, lines.filter((line) => ICON_SETTING.test(line)).join("\n"))
       }

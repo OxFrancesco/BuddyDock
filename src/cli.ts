@@ -83,12 +83,13 @@ const run = Command.make("run", {
 const styledManifest = Options.file("manifest").pipe(Options.withAlias("m"), Options.withDefault("styled-icons/manifest.json"))
 const noRestart = Options.boolean("no-restart")
 const relaunch = Options.boolean("relaunch").pipe(Options.withDescription("Quit and reopen running apps so their Dock tile picks up the new icon"))
+const onlyMissing = Options.boolean("only-missing").pipe(Options.withDescription("Skip apps that already carry a complete custom icon; used by the persist agent"))
 
 const summarize = (label: string) => (results: ReadonlyArray<{ applied: boolean }>) =>
   Console.log(`${label} ${results.filter((r) => r.applied).length}/${results.length} app icons`)
 
-const apply = Command.make("apply", { manifest: styledManifest, noRestart, relaunch }, ({ manifest, noRestart, relaunch }) =>
-  applyManifest({ manifestPath: manifest, reset: false, restartDock: !noRestart, relaunch }).pipe(
+const apply = Command.make("apply", { manifest: styledManifest, noRestart, relaunch, onlyMissing }, ({ manifest, noRestart, relaunch, onlyMissing }) =>
+  applyManifest({ manifestPath: manifest, reset: false, restartDock: !noRestart, relaunch, onlyMissing }).pipe(
     Effect.flatMap(summarize("Applied")),
     Effect.asVoid
   )
