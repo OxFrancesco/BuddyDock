@@ -14,6 +14,7 @@ export interface ApplyOptions {
   readonly manifestPath: string
   readonly reset: boolean
   readonly restartDock: boolean
+  readonly relaunch: boolean
 }
 
 const resolveApplier = Effect.promise(async () => {
@@ -50,6 +51,25 @@ export const restartDock = Effect.tryPromise({
   catch: (cause) => new DockApplyError({ message: "Could not restart the Dock", cause })
 })
 
+// A running app draws its Dock tile from memory, so a changed icon only shows after it relaunches.
+const relaunchIfRunning = (appPath: string, bundleIdentifier: string | null) =>
+  Effect.tryPromise({
+    try: async () => {
+      const running = bundleIdentifier
+        ? (await Bun.$`pgrep -fq ${appPath}/Contents/MacOS/`.nothrow().quiet()).exitCode === 0
+        : false
+      if (!running) return false
+      await Bun.$`osascript -e ${`tell application id "${bundleIdentifier}" to quit`}`.quiet()
+      for (let i = 0; i < 50; i++) {
+        if ((await Bun.$`pgrep -fq ${appPath}/Contents/MacOS/`.nothrow().quiet()).exitCode !== 0) break
+        await Bun.sleep(200)
+      }
+      await Bun.$`open -g ${appPath}`.quiet()
+      return true
+    },
+    catch: (cause) => new DockApplyError({ message: `Could not relaunch ${appPath}`, cause })
+  })
+
 export const applyManifest = (options: ApplyOptions) =>
   Effect.gen(function*() {
     if (process.platform !== "darwin") {
@@ -70,6 +90,12 @@ export const applyManifest = (options: ApplyOptions) =>
           (result.error ? ` — ${result.error}` : "")
       ))
 
+    if (options.relaunch) {
+      yield* Effect.forEach(manifest.icons.filter((_, i) => results[i]?.applied), (icon) =>
+        relaunchIfRunning(icon.appPath, icon.bundleIdentifier).pipe(
+          Effect.tap((relaunched) => relaunched ? Console.log(`Relaunched ${icon.name}`) : Effect.void)
+        ), { concurrency: 1 })
+    }
     if (options.restartDock) yield* restartDock
     return results
   })

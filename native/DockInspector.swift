@@ -45,8 +45,26 @@ func appURL(from tile: [String: Any]) -> URL? {
     return URL(fileURLWithPath: rawURL)
 }
 
+// Prefer the icon shipped inside the bundle so a previously applied custom icon
+// (Icon\r resource) is never used as the source for a new style.
+func originalIcon(for appURL: URL) -> NSImage {
+    if let bundle = Bundle(url: appURL) {
+        let names = [
+            bundle.object(forInfoDictionaryKey: "CFBundleIconFile") as? String,
+            bundle.object(forInfoDictionaryKey: "CFBundleIconName") as? String
+        ].compactMap { $0 }
+        for name in names {
+            let base = (name as NSString).deletingPathExtension
+            if let url = bundle.url(forResource: base, withExtension: "icns"), let image = NSImage(contentsOf: url) {
+                return image
+            }
+        }
+    }
+    return NSWorkspace.shared.icon(forFile: appURL.path)
+}
+
 func exportIcon(for appURL: URL, to destination: URL) throws {
-    let image = NSWorkspace.shared.icon(forFile: appURL.path)
+    let image = originalIcon(for: appURL)
     image.size = NSSize(width: 1024, height: 1024)
 
     guard

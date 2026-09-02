@@ -57,7 +57,7 @@ bun run buddydock reset --manifest styled-icons/manifest.json
 - `scan`: reads `com.apple.dock` and exports each pinned app icon plus `manifest.json`.
 - `style`: styles the icons in an existing scan manifest and masks them into squircles.
 - `run`: scans and styles in one pass.
-- `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip).
+- `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip). Running apps keep drawing their old tile from memory, so pass `--relaunch` to quit and reopen them, or reopen them yourself.
 - `reset`: removes the custom icons for the apps in a styled manifest.
 
 Generated icons include a second manifest recording source paths, theme, and model IDs. BuddyDock processes sequentially to keep cost and rate behavior predictable.
