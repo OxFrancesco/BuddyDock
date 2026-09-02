@@ -4,6 +4,7 @@ import { applyGhosttyIcon, GHOSTTY_BUNDLE_ID, resetGhosttyIcon } from "./ghostty
 import { readJson } from "./files.ts"
 import { applyRuntimeIconResources, resetRuntimeIconResources, RUNTIME_ICON_RESOURCES } from "./overrides.ts"
 import { StyledManifest } from "./model.ts"
+import { forgetActiveManifest, rememberActiveManifest } from "./persist.ts"
 
 const ApplyResult = Schema.Struct({
   appPath: Schema.String,
@@ -128,6 +129,8 @@ export const applyManifest = (options: ApplyOptions) =>
           Effect.tap((relaunched) => relaunched ? Console.log(`Relaunched ${icon.name}`) : Effect.void)
         ), { concurrency: 1 })
     }
+    if (options.reset) yield* forgetActiveManifest
+    else yield* rememberActiveManifest(options.manifestPath)
     if (options.restartDock) yield* restartDock
     return results
   })

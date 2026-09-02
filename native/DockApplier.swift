@@ -41,13 +41,22 @@ func setIcon(_ request: ApplyRequest, reset: Bool) -> ApplyResult {
         image = loaded
     }
 
-    let ok = NSWorkspace.shared.setIcon(image, forFile: request.appPath, options: [])
+    var ok = NSWorkspace.shared.setIcon(image, forFile: request.appPath, options: [])
+    if !ok {
+        // Finder occasionally rejects the first write right after a bundle was replaced.
+        Thread.sleep(forTimeInterval: 0.5)
+        ok = NSWorkspace.shared.setIcon(image, forFile: request.appPath, options: [])
+    }
     if ok { return ApplyResult(appPath: request.appPath, applied: true, error: nil) }
 
+    let attributes = try? FileManager.default.attributesOfItem(atPath: request.appPath)
+    let owner = attributes?[.ownerAccountName] as? String ?? "?"
     let writable = FileManager.default.isWritableFile(atPath: request.appPath)
     let hint = writable
         ? "NSWorkspace.setIcon returned false"
-        : "not writable by \(NSUserName()); re-run with sudo or fix ownership"
+        : owner == NSUserName()
+            ? "write denied by macOS App Management; grant it to this process (System Settings > Privacy & Security > App Management)"
+            : "owned by \(owner); re-run with sudo or fix ownership"
     return ApplyResult(appPath: request.appPath, applied: false, error: hint)
 }
 

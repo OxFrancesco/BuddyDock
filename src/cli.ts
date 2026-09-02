@@ -7,6 +7,7 @@ import { applyManifest } from "./apply.ts"
 import { scanDock } from "./dock.ts"
 import { FalGateway } from "./fal.ts"
 import { defaultIconPackDirectory, reapplyIconPack } from "./icon-pack.ts"
+import { installAgent, uninstallAgent } from "./persist.ts"
 import { styleManifest } from "./style.ts"
 
 const output = Options.directory("output").pipe(Options.withAlias("o"))
@@ -112,9 +113,17 @@ const reapply = Command.make("reapply", {
   })
 ).pipe(Command.withDescription("Reapply a saved icon pack and refresh the Dock"))
 
+const persist = Command.make("persist", {}, () => installAgent).pipe(
+  Command.withDescription("Install a launchd agent that re-applies the last applied manifest whenever an app is updated")
+)
+
+const unpersist = Command.make("unpersist", {}, () => uninstallAgent).pipe(
+  Command.withDescription("Remove the launchd agent installed by persist")
+)
+
 const root = Command.make("buddydock").pipe(
   Command.withDescription("Create cohesive, AI-styled versions of your macOS Dock icons"),
-  Command.withSubcommands([scan, style, run, apply, reset, reapply])
+  Command.withSubcommands([scan, style, run, apply, reset, reapply, persist, unpersist])
 )
 
 const cli = Command.run(root, { name: "BuddyDock", version: "0.1.0" })
