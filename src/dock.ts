@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import { DockScanError } from "./errors.ts"
-import { ensureDirectory, writeJson } from "./files.ts"
+import { ensureDirectory, resolveNativeHelper, writeJson } from "./files.ts"
 import { DockIcons, type ScanManifest } from "./model.ts"
 
 export const scanDock = (outputDirectory: string) =>
@@ -12,14 +12,7 @@ export const scanDock = (outputDirectory: string) =>
     const iconDirectory = `${outputDirectory}/icons`
     yield* ensureDirectory(iconDirectory)
 
-    const compiledInspector = new URL("../dist/buddydock-inspector", import.meta.url).pathname
-    const sourceInspector = new URL("../native/DockInspector.swift", import.meta.url).pathname
-    const inspector = yield* Effect.promise(async () =>
-      await Bun.file(compiledInspector).exists() ? compiledInspector : sourceInspector
-    )
-    const command = inspector.endsWith(".swift")
-      ? ["swift", inspector, iconDirectory]
-      : [inspector, iconDirectory]
+    const command = [...(yield* resolveNativeHelper("buddydock-inspector", "DockInspector.swift")), iconDirectory]
 
     const processResult = yield* Effect.tryPromise({
       try: async () => {

@@ -1,6 +1,21 @@
 import { Effect, Schema } from "effect"
 import { ManifestError } from "./errors.ts"
 
+// Running from source, import.meta.url points into src/. Running as the compiled
+// BuddyDock.app binary it points into a virtual bundle, so helpers live next to
+// the executable instead.
+export const isCompiledApp = process.execPath.endsWith("/Contents/MacOS/BuddyDock")
+const executableDirectory = process.execPath.replace(/\/[^/]*$/, "")
+
+export const resolveNativeHelper = (name: string, swiftSource: string) =>
+  Effect.promise(async () => {
+    const candidates = isCompiledApp
+      ? [`${executableDirectory}/${name}`]
+      : [new URL(`../dist/${name}`, import.meta.url).pathname]
+    for (const candidate of candidates) if (await Bun.file(candidate).exists()) return [candidate]
+    return ["swift", new URL(`../native/${swiftSource}`, import.meta.url).pathname]
+  })
+
 export const ensureDirectory = (path: string) =>
   Effect.tryPromise({
     try: () => Bun.$`mkdir -p ${path}`.quiet(),

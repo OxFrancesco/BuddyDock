@@ -22,7 +22,7 @@ bun install
 bun run build
 ```
 
-The build creates `dist/buddydock.js` and the optimized native helper at `dist/buddydock-inspector`.
+The build creates `dist/buddydock.js`, the optimized native helpers (`dist/buddydock-inspector`, `-applier`, `-squircle`), and a standalone `dist/BuddyDock.app` used by the persist agent.
 
 ## Usage
 
@@ -65,8 +65,9 @@ bun run buddydock reset --manifest styled-icons/manifest.json
 - `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip). Ghostty is handled through its native `macos-custom-icon` setting instead (see below), using the manifest directory name as the pack name. Running apps keep drawing their old tile from memory, so pass `--relaunch` to quit and reopen them, or reopen them yourself.
 - `reset`: removes the custom icons for the apps in a styled manifest. Apps that set their own Dock icon at runtime from a bundled image (currently Superhuman) also get that image swapped, with the originals backed up under `~/Library/Application Support/BuddyDock/resource-backups`; app updates revert this, so re-run `apply` afterwards.
 - `reapply`: reapplies a saved `.icns` icon pack via the scripts below (`--sudo` for root-owned apps).
-- `persist`: installs a launchd agent (`ai.buddydock.persist`) that watches `/Applications` and every managed bundle and re-runs `apply --only-missing` with the last applied manifest whenever one changes (apps that already carry a complete custom icon are left untouched, so the agent never writes when nothing is wrong and never triggers itself), so updates do not lose the icons. The agent runs `bun` directly, so grant that binary App Management access once (System Settings > Privacy & Security > App Management), otherwise writes are denied. Log: `~/Library/Application Support/BuddyDock/persist.log`.
+- `persist`: installs a launchd agent (`ai.buddydock.persist`) that watches `/Applications` and every managed bundle and re-runs `apply --only-missing` with the last applied manifest whenever one changes (apps that already carry a complete custom icon are left untouched, so the agent never writes when nothing is wrong and never triggers itself), so updates do not lose the icons. The agent runs the compiled `dist/BuddyDock.app` (built by `bun run build`), which is what needs App Management access once, otherwise writes are denied. Log: `~/Library/Application Support/BuddyDock/persist.log`.
 - `unpersist`: removes that agent.
+- `grant-access`: opens System Settings > Privacy & Security > App Management with the `BuddyDock.app` path copied to the clipboard, so you can add it in a few clicks.
 
 Generated icons include a second manifest recording source paths, theme, and model IDs. BuddyDock processes sequentially to keep cost and rate behavior predictable.
 

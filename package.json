@@ -10,10 +10,11 @@
     "buddydock": "bun run src/cli.ts",
     "build:native": "mkdir -p dist && swiftc -O native/DockInspector.swift -o dist/buddydock-inspector && swiftc -O native/Squircle.swift -o dist/buddydock-squircle && swiftc -O native/DockApplier.swift -o dist/buddydock-applier",
     "build:cli": "bun build src/cli.ts --target=bun --outfile=dist/buddydock.js",
-    "build": "rm -rf dist && bun run build:native && bun run build:cli",
+    "build": "rm -rf dist && bun run build:native && bun run build:cli && bun run build:app",
     "typecheck": "tsc --noEmit",
     "test": "bun test ./test",
-    "check": "bun run typecheck && bun run test"
+    "check": "bun run typecheck && bun run test",
+    "build:app": "APP=dist/BuddyDock.app/Contents && mkdir -p $APP/MacOS $APP/Resources && bun build src/cli.ts --compile --outfile $APP/MacOS/BuddyDock && cp dist/buddydock-inspector dist/buddydock-applier dist/buddydock-squircle $APP/MacOS/ && cp native/Info.plist $APP/Info.plist && codesign --force --sign - --identifier ai.buddydock.cli dist/BuddyDock.app"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -28,5 +29,11 @@
     "@fal-ai/client": "^1.10.1",
     "effect": "^3.21.4"
   },
-  "keywords": ["macos", "dock", "icons", "effect", "fal-ai"]
+  "keywords": [
+    "macos",
+    "dock",
+    "icons",
+    "effect",
+    "fal-ai"
+  ]
 }

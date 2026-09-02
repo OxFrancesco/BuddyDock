@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { ensureDirectory, readJson, writeJson } from "./files.ts"
+import { ensureDirectory, readJson, resolveNativeHelper, writeJson } from "./files.ts"
 import { FalGateway } from "./fal.ts"
 import { ScanManifest, type StyledIcon, type StyledManifest } from "./model.ts"
 
@@ -20,11 +20,7 @@ export const stylePrompt = (name: string, theme: string) =>
   "no white margins, no rounded tile, no drop shadow outside the artwork; the rounded corners are added later. " +
   "Use polished, production-quality materials and lighting. Do not add words, letters, watermarks, or borders."
 
-const resolveSquircle = Effect.promise(async () => {
-  const compiled = new URL("../dist/buddydock-squircle", import.meta.url).pathname
-  const source = new URL("../native/Squircle.swift", import.meta.url).pathname
-  return await Bun.file(compiled).exists() ? [compiled] : ["swift", source]
-})
+const resolveSquircle = resolveNativeHelper("buddydock-squircle", "Squircle.swift")
 
 const squircle = (inputPath: string, outputPath: string) =>
   Effect.gen(function*() {

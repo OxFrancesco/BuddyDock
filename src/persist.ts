@@ -1,6 +1,6 @@
 import { Console, Effect } from "effect"
 import { DockApplyError } from "./errors.ts"
-import { readJson, writeJson } from "./files.ts"
+import { isCompiledApp, readJson, writeJson } from "./files.ts"
 import { StyledManifest } from "./model.ts"
 
 // App updaters replace the whole .app bundle, which drops the Finder custom icon
@@ -41,8 +41,7 @@ const xml = (value: string) =>
   value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
 
 export const agentPlist = (options: {
-  readonly bun: string
-  readonly cli: string
+  readonly executable: string
   readonly manifest: string
   readonly watchPaths: ReadonlyArray<string>
 }) => `<?xml version="1.0" encoding="UTF-8"?>
@@ -52,8 +51,7 @@ export const agentPlist = (options: {
   <key>Label</key><string>${AGENT_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${xml(options.bun)}</string>
-    <string>${xml(options.cli)}</string>
+    <string>${xml(options.executable)}</string>
     <string>apply</string>
     <string>--manifest</string>
     <string>${xml(options.manifest)}</string>
@@ -77,12 +75,8 @@ export const installAgent = Effect.gen(function*() {
   }
   const styled = yield* readJson(manifest, StyledManifest)
   const watchPaths = ["/Applications", ...styled.icons.flatMap((icon) => [icon.appPath, `${icon.appPath}/Contents`])]
-  const plist = agentPlist({
-    bun: process.execPath,
-    cli: new URL("./cli.ts", import.meta.url).pathname,
-    manifest,
-    watchPaths
-  })
+  const executable = yield* appExecutable
+  const plist = agentPlist({ executable, manifest, watchPaths })
   const path = agentPlistPath()
   yield* Effect.tryPromise({
     try: async () => {
@@ -95,6 +89,36 @@ export const installAgent = Effect.gen(function*() {
   })
   yield* Console.log(`Installed ${AGENT_LABEL}: watching ${watchPaths.length} paths, re-applying ${styled.icons.length} icons on change`)
   yield* Console.log(`Log: ${logPath()}`)
+  yield* Console.log("If the log shows \"write denied by macOS App Management\", run `buddydock grant-access` once.")
+})
+
+// macOS grants App Management to the executable that does the writing, so the
+// agent runs the compiled BuddyDock.app rather than bun. That is what shows up in
+// System Settings and what the user grants.
+const appExecutable = Effect.gen(function*() {
+  if (isCompiledApp) return process.execPath
+  const bundled = new URL("../dist/BuddyDock.app/Contents/MacOS/BuddyDock", import.meta.url).pathname
+  if (yield* Effect.promise(() => Bun.file(bundled).exists())) return bundled
+  return yield* new DockApplyError({ message: "dist/BuddyDock.app is missing. Run `bun run build` first." })
+})
+
+const appBundle = (executable: string) => executable.replace(/\/Contents\/MacOS\/BuddyDock$/, "")
+
+export const requestAppManagementAccess = Effect.gen(function*() {
+  const bundle = appBundle(yield* appExecutable)
+  yield* Effect.tryPromise({
+    try: async () => {
+      await Bun.$`open ${"x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"}`.quiet()
+      const clip = Bun.spawn(["pbcopy"], { stdin: "pipe" })
+      clip.stdin.write(bundle)
+      clip.stdin.end()
+      await clip.exited
+    },
+    catch: fail("Could not open System Settings")
+  })
+  yield* Console.log("Opened System Settings > Privacy & Security > App Management.")
+  yield* Console.log(`BuddyDock.app's path is in your clipboard: ${bundle}`)
+  yield* Console.log("Click +, press Cmd+Shift+G, paste, Enter, then Open, and make sure BuddyDock's toggle is on.")
 })
 
 export const uninstallAgent = Effect.gen(function*() {

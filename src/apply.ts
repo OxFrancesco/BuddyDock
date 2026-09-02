@@ -1,7 +1,7 @@
 import { Console, Effect, Schema } from "effect"
 import { DockApplyError } from "./errors.ts"
 import { applyGhosttyIcon, GHOSTTY_BUNDLE_ID, resetGhosttyIcon } from "./ghostty.ts"
-import { readJson } from "./files.ts"
+import { readJson, resolveNativeHelper } from "./files.ts"
 import { applyRuntimeIconResources, resetRuntimeIconResources, RUNTIME_ICON_RESOURCES } from "./overrides.ts"
 import { StyledManifest } from "./model.ts"
 import { forgetActiveManifest, rememberActiveManifest } from "./persist.ts"
@@ -21,11 +21,7 @@ export interface ApplyOptions {
   readonly onlyMissing?: boolean
 }
 
-const resolveApplier = Effect.promise(async () => {
-  const compiled = new URL("../dist/buddydock-applier", import.meta.url).pathname
-  const source = new URL("../native/DockApplier.swift", import.meta.url).pathname
-  return await Bun.file(compiled).exists() ? [compiled] : ["swift", source]
-})
+const resolveApplier = resolveNativeHelper("buddydock-applier", "DockApplier.swift")
 
 const runApplier = (mode: "apply" | "apply-missing" | "reset", requests: ReadonlyArray<{ appPath: string; iconPath: string | null }>) =>
   Effect.gen(function*() {

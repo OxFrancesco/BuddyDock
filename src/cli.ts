@@ -7,7 +7,7 @@ import { applyManifest } from "./apply.ts"
 import { scanDock } from "./dock.ts"
 import { FalGateway } from "./fal.ts"
 import { defaultIconPackDirectory, reapplyIconPack } from "./icon-pack.ts"
-import { installAgent, uninstallAgent } from "./persist.ts"
+import { installAgent, requestAppManagementAccess, uninstallAgent } from "./persist.ts"
 import { styleManifest } from "./style.ts"
 
 const output = Options.directory("output").pipe(Options.withAlias("o"))
@@ -122,9 +122,13 @@ const unpersist = Command.make("unpersist", {}, () => uninstallAgent).pipe(
   Command.withDescription("Remove the launchd agent installed by persist")
 )
 
+const grantAccess = Command.make("grant-access", {}, () => requestAppManagementAccess).pipe(
+  Command.withDescription("Open the App Management privacy pane with the bun path ready to paste, so the persist agent may write inside app bundles")
+)
+
 const root = Command.make("buddydock").pipe(
   Command.withDescription("Create cohesive, AI-styled versions of your macOS Dock icons"),
-  Command.withSubcommands([scan, style, run, apply, reset, reapply, persist, unpersist])
+  Command.withSubcommands([scan, style, run, apply, reset, reapply, persist, unpersist, grantAccess])
 )
 
 const cli = Command.run(root, { name: "BuddyDock", version: "0.1.0" })
