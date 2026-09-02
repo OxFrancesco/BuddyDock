@@ -15,6 +15,7 @@ const theme = Options.text("theme").pipe(Options.withAlias("t"), Options.withDef
 const quality = Options.choice("quality", ["low", "medium", "high"] as const).pipe(Options.withDefault("medium"))
 const removeBackground = Options.boolean("remove-background")
 const limit = Options.integer("limit").pipe(Options.optional)
+const resume = Options.boolean("resume").pipe(Options.withDescription("Reuse icons already present in the output directory instead of regenerating them"))
 
 const scan = Command.make("scan", { output: scanOutput }, ({ output }) =>
   scanDock(output).pipe(
@@ -29,15 +30,17 @@ const style = Command.make("style", {
   theme,
   quality,
   removeBackground,
-  limit
-}, ({ manifest, output, theme, quality, removeBackground, limit }) =>
+  limit,
+  resume
+}, ({ manifest, output, theme, quality, removeBackground, limit, resume }) =>
   styleManifest({
     manifestPath: manifest,
     outputDirectory: output,
     theme,
     quality,
     removeBackground,
-    limit: Option.getOrUndefined(limit)
+    limit: Option.getOrUndefined(limit),
+    resume
   }).pipe(
     Effect.flatMap((result) => Console.log(`Created ${result.icons.length} styled icons in ${output}`)),
     Effect.asVoid

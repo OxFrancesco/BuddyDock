@@ -1,5 +1,5 @@
 import { fal } from "@fal-ai/client"
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, Schedule, Schema } from "effect"
 import { FalError } from "./errors.ts"
 
 const falKey = process.env.FAL_KEY ?? process.env.FAL_API_KEY
@@ -46,7 +46,7 @@ export class FalGateway extends Context.Tag("buddydock/FalGateway")<FalGateway, 
             }
           }),
           catch: (cause) => new FalError({ stage: "edit", message: "GPT Image 2 edit failed", cause })
-        })
+        }).pipe(Effect.retry({ times: 2, schedule: Schedule.exponential("2 seconds") }))
         const edit = yield* Schema.decodeUnknown(EditResponse)(editResult.data).pipe(
           Effect.mapError((cause) => new FalError({ stage: "edit", message: "GPT Image 2 returned an invalid response", cause }))
         )

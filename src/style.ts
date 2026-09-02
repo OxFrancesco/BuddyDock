@@ -10,6 +10,7 @@ export interface StyleOptions {
   readonly quality: "low" | "medium" | "high"
   readonly removeBackground: boolean
   readonly limit?: number
+  readonly resume?: boolean
 }
 
 export const stylePrompt = (name: string, theme: string) =>
@@ -47,21 +48,26 @@ export const styleManifest = (options: StyleOptions) =>
 
     const icons = yield* Effect.forEach(selected, (icon, index) =>
       Effect.gen(function*() {
-        yield* Console.log(`[${index + 1}/${selected.length}] Styling ${icon.name}`)
-        const bytes = yield* gateway.style({
-          imagePath: icon.iconPath,
-          prompt: stylePrompt(icon.name, options.theme),
-          quality: options.quality,
-          removeBackground: options.removeBackground
-        })
         const fileName = `${String(index + 1).padStart(2, "0")}-${icon.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.png`
         const styledIconPath = `${options.outputDirectory}/${fileName}`
         const rawIconPath = `${options.outputDirectory}/raw/${fileName}`
-        yield* Effect.tryPromise({
-          try: () => Bun.write(rawIconPath, bytes),
-          catch: (cause) => new Error(`Could not write ${rawIconPath}: ${String(cause)}`)
-        })
-        yield* squircle(rawIconPath, styledIconPath)
+        const existing = yield* Effect.promise(() => Bun.file(styledIconPath).exists())
+        if (options.resume && existing) {
+          yield* Console.log(`[${index + 1}/${selected.length}] Reusing ${icon.name}`)
+        } else {
+          yield* Console.log(`[${index + 1}/${selected.length}] Styling ${icon.name}`)
+          const bytes = yield* gateway.style({
+            imagePath: icon.iconPath,
+            prompt: stylePrompt(icon.name, options.theme),
+            quality: options.quality,
+            removeBackground: options.removeBackground
+          })
+          yield* Effect.tryPromise({
+            try: () => Bun.write(rawIconPath, bytes),
+            catch: (cause) => new Error(`Could not write ${rawIconPath}: ${String(cause)}`)
+          })
+          yield* squircle(rawIconPath, styledIconPath)
+        }
         return {
           ...icon,
           styledIconPath,
