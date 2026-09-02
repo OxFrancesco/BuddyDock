@@ -14,8 +14,29 @@ export interface StyleOptions {
 
 export const stylePrompt = (name: string, theme: string) =>
   `Restyle this ${name} macOS app icon in a cohesive ${theme} aesthetic. ` +
-  "Preserve its core silhouette, recognizable brand cues, centered composition, and square app-icon framing. " +
-  "Use polished, production-quality materials and lighting. Do not add words, letters, watermarks, borders, or a scene background."
+  "Preserve its core silhouette and recognizable brand cues, centered and occupying about 60% of the frame. " +
+  "Fill the ENTIRE square canvas edge to edge with a solid, opaque, high-contrast themed background — no transparency, " +
+  "no white margins, no rounded tile, no drop shadow outside the artwork; the rounded corners are added later. " +
+  "Use polished, production-quality materials and lighting. Do not add words, letters, watermarks, or borders."
+
+const resolveSquircle = Effect.promise(async () => {
+  const compiled = new URL("../dist/buddydock-squircle", import.meta.url).pathname
+  const source = new URL("../native/Squircle.swift", import.meta.url).pathname
+  return await Bun.file(compiled).exists() ? [compiled] : ["swift", source]
+})
+
+const squircle = (inputPath: string, outputPath: string) =>
+  Effect.gen(function*() {
+    const tool = yield* resolveSquircle
+    yield* Effect.tryPromise({
+      try: async () => {
+        const child = Bun.spawn([...tool, inputPath, outputPath], { stdout: "ignore", stderr: "pipe" })
+        const [stderr, exitCode] = await Promise.all([new Response(child.stderr).text(), child.exited])
+        if (exitCode !== 0) throw new Error(stderr.trim() || `Squircle exited with code ${exitCode}`)
+      },
+      catch: (cause) => new Error(`Could not mask ${inputPath}: ${String(cause)}`)
+    })
+  })
 
 export const styleManifest = (options: StyleOptions) =>
   Effect.gen(function*() {
@@ -35,10 +56,12 @@ export const styleManifest = (options: StyleOptions) =>
         })
         const fileName = `${String(index + 1).padStart(2, "0")}-${icon.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.png`
         const styledIconPath = `${options.outputDirectory}/${fileName}`
+        const rawIconPath = `${options.outputDirectory}/raw/${fileName}`
         yield* Effect.tryPromise({
-          try: () => Bun.write(styledIconPath, bytes),
-          catch: (cause) => new Error(`Could not write ${styledIconPath}: ${String(cause)}`)
+          try: () => Bun.write(rawIconPath, bytes),
+          catch: (cause) => new Error(`Could not write ${rawIconPath}: ${String(cause)}`)
         })
+        yield* squircle(rawIconPath, styledIconPath)
         return {
           ...icon,
           styledIconPath,

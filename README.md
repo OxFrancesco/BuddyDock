@@ -43,7 +43,7 @@ Scan and style in one operation:
 doppler run -- bun run buddydock run --theme "candy cotton" --quality medium
 ```
 
-For a cheap one-icon smoke test, add `--limit 1 --quality low`. Add `--keep-background` to skip BiRefNet.
+For a cheap one-icon smoke test, add `--limit 1 --quality low`. Every icon is masked into a macOS squircle (824px tile on a 1024px canvas) by the native `Squircle` helper, so shapes are consistent regardless of what the model draws; the unmasked output is kept in `raw/`. Add `--remove-background` to also run BiRefNet on the artwork.
 
 Apply a styled set to your Dock (restarts the Dock), or undo it:
 
@@ -55,7 +55,7 @@ bun run buddydock reset --manifest styled-icons/manifest.json
 ## Commands
 
 - `scan`: reads `com.apple.dock` and exports each pinned app icon plus `manifest.json`.
-- `style`: styles the icons in an existing scan manifest.
+- `style`: styles the icons in an existing scan manifest and masks them into squircles.
 - `run`: scans and styles in one pass.
 - `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip).
 - `reset`: removes the custom icons for the apps in a styled manifest.

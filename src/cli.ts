@@ -13,7 +13,7 @@ const scanOutput = output.pipe(Options.withDefault(".buddydock/scan"))
 const runScanOutput = Options.directory("scan-output").pipe(Options.withDefault(".buddydock/scan"))
 const theme = Options.text("theme").pipe(Options.withAlias("t"), Options.withDefault("candy cotton"))
 const quality = Options.choice("quality", ["low", "medium", "high"] as const).pipe(Options.withDefault("medium"))
-const keepBackground = Options.boolean("keep-background")
+const removeBackground = Options.boolean("remove-background")
 const limit = Options.integer("limit").pipe(Options.optional)
 
 const scan = Command.make("scan", { output: scanOutput }, ({ output }) =>
@@ -28,15 +28,15 @@ const style = Command.make("style", {
   output: output.pipe(Options.withDefault("styled-icons")),
   theme,
   quality,
-  keepBackground,
+  removeBackground,
   limit
-}, ({ manifest, output, theme, quality, keepBackground, limit }) =>
+}, ({ manifest, output, theme, quality, removeBackground, limit }) =>
   styleManifest({
     manifestPath: manifest,
     outputDirectory: output,
     theme,
     quality,
-    removeBackground: !keepBackground,
+    removeBackground,
     limit: Option.getOrUndefined(limit)
   }).pipe(
     Effect.flatMap((result) => Console.log(`Created ${result.icons.length} styled icons in ${output}`)),
@@ -49,9 +49,9 @@ const run = Command.make("run", {
   output: output.pipe(Options.withDefault("styled-icons")),
   theme,
   quality,
-  keepBackground,
+  removeBackground,
   limit
-}, ({ scanOutput, output, theme, quality, keepBackground, limit }) =>
+}, ({ scanOutput, output, theme, quality, removeBackground, limit }) =>
   Effect.gen(function*() {
     const scan = yield* scanDock(scanOutput)
     const result = yield* styleManifest({
@@ -59,7 +59,7 @@ const run = Command.make("run", {
       outputDirectory: output,
       theme,
       quality,
-      removeBackground: !keepBackground,
+      removeBackground,
       limit: Option.getOrUndefined(limit)
     })
     yield* Console.log(`Exported ${scan.icons.length} icons and styled ${result.icons.length} in ${output}`)
