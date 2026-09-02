@@ -1,5 +1,6 @@
 import { Console, Effect, Schema } from "effect"
 import { DockApplyError } from "./errors.ts"
+import { applyGhosttyIcon, GHOSTTY_BUNDLE_ID, resetGhosttyIcon } from "./ghostty.ts"
 import { readJson } from "./files.ts"
 import { StyledManifest } from "./model.ts"
 
@@ -76,14 +77,29 @@ export const applyManifest = (options: ApplyOptions) =>
       return yield* new DockApplyError({ message: "Applying Dock icons requires macOS" })
     }
     const manifest = yield* readJson(options.manifestPath, StyledManifest)
-    const requests = manifest.icons.map((icon) => ({
-      appPath: icon.appPath,
-      iconPath: options.reset
-        ? null
-        : icon.styledIconPath.startsWith("/") ? icon.styledIconPath : `${process.cwd()}/${icon.styledIconPath}`
-    }))
+    const absoluteManifest = options.manifestPath.startsWith("/") ? options.manifestPath : `${process.cwd()}/${options.manifestPath}`
+    const packName = absoluteManifest.split("/").at(-2) ?? "styled-icons"
+    const absolute = (path: string) => path.startsWith("/") ? path : `${process.cwd()}/${path}`
+    const isGhostty = (icon: { bundleIdentifier: string | null }) => icon.bundleIdentifier === GHOSTTY_BUNDLE_ID
 
-    const results = yield* runApplier(options.reset ? "reset" : "apply", requests)
+    const finderIcons = manifest.icons.filter((icon) => !isGhostty(icon))
+    const finderResults = yield* runApplier(options.reset ? "reset" : "apply", finderIcons.map((icon) => ({
+      appPath: icon.appPath,
+      iconPath: options.reset ? null : absolute(icon.styledIconPath)
+    })))
+    const ghosttyResults = yield* Effect.forEach(manifest.icons.filter(isGhostty), (icon) =>
+      (options.reset ? resetGhosttyIcon(packName) : applyGhosttyIcon(packName, absolute(icon.styledIconPath))).pipe(
+        Effect.map((config) => ({
+          appPath: icon.appPath,
+          applied: config !== null,
+          error: config === null ? "no saved Ghostty state for this pack; settings left unchanged" : `via Ghostty config ${config}`
+        })),
+        Effect.catchAll((e) => Effect.succeed({ appPath: icon.appPath, applied: false, error: e.message }))
+      ))
+
+    const results = manifest.icons.map((icon) =>
+      [...finderResults, ...ghosttyResults].find((r) => r.appPath === icon.appPath)
+        ?? { appPath: icon.appPath, applied: false, error: "no result" })
     yield* Effect.forEach(results, (result, index) =>
       Console.log(
         `[${index + 1}/${results.length}] ${result.applied ? "ok  " : "FAIL"} ${manifest.icons[index]?.name ?? result.appPath}` +

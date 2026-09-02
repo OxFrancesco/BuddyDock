@@ -62,7 +62,7 @@ bun run buddydock reset --manifest styled-icons/manifest.json
 - `scan`: reads `com.apple.dock` and exports each pinned app icon plus `manifest.json`.
 - `style`: styles the icons in an existing scan manifest and masks them into squircles.
 - `run`: scans and styles in one pass.
-- `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip). Running apps keep drawing their old tile from memory, so pass `--relaunch` to quit and reopen them, or reopen them yourself.
+- `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip). Ghostty is handled through its native `macos-custom-icon` setting instead (see below), using the manifest directory name as the pack name. Running apps keep drawing their old tile from memory, so pass `--relaunch` to quit and reopen them, or reopen them yourself.
 - `reset`: removes the custom icons for the apps in a styled manifest.
 - `reapply`: reapplies a saved `.icns` icon pack via the scripts below (`--sudo` for root-owned apps).
 
