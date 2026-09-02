@@ -104,8 +104,27 @@ const appExecutable = Effect.gen(function*() {
 
 const appBundle = (executable: string) => executable.replace(/\/Contents\/MacOS\/BuddyDock$/, "")
 
+// TCC's per-user database is readable by the user; 2 = allowed, 0 = denied/off.
+const appManagementStatus = Effect.promise(async () => {
+  const db = `${process.env.HOME}/Library/Application Support/com.apple.TCC/TCC.db`
+  const out = await Bun.$`sqlite3 ${db} ${"select auth_value from access where service='kTCCServiceSystemPolicyAppBundles' and client='ai.buddydock.cli'"}`.nothrow().quiet()
+  const value = out.text().trim()
+  return value === "" ? "missing" as const : value === "2" ? "allowed" as const : "off" as const
+})
+
 export const requestAppManagementAccess = Effect.gen(function*() {
   const bundle = appBundle(yield* appExecutable)
+  const status = yield* appManagementStatus
+  if (status === "allowed") {
+    return yield* Console.log("BuddyDock already has App Management access.")
+  }
+  if (status === "off") {
+    yield* Effect.tryPromise({
+      try: () => Bun.$`open ${"x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"}`.quiet(),
+      catch: fail("Could not open System Settings")
+    })
+    return yield* Console.log("BuddyDock is already listed under App Management but switched off. Turn its toggle on.")
+  }
   yield* Effect.tryPromise({
     try: async () => {
       await Bun.$`open ${"x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"}`.quiet()
