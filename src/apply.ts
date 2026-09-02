@@ -2,6 +2,7 @@ import { Console, Effect, Schema } from "effect"
 import { DockApplyError } from "./errors.ts"
 import { applyGhosttyIcon, GHOSTTY_BUNDLE_ID, resetGhosttyIcon } from "./ghostty.ts"
 import { readJson } from "./files.ts"
+import { applyRuntimeIconResources, resetRuntimeIconResources, RUNTIME_ICON_RESOURCES } from "./overrides.ts"
 import { StyledManifest } from "./model.ts"
 
 const ApplyResult = Schema.Struct({
@@ -97,9 +98,24 @@ export const applyManifest = (options: ApplyOptions) =>
         Effect.catchAll((e) => Effect.succeed({ appPath: icon.appPath, applied: false, error: e.message }))
       ))
 
-    const results = manifest.icons.map((icon) =>
-      [...finderResults, ...ghosttyResults].find((r) => r.appPath === icon.appPath)
-        ?? { appPath: icon.appPath, applied: false, error: "no result" })
+    const runtimeNotes = yield* Effect.forEach(
+      manifest.icons.filter((icon) => icon.bundleIdentifier !== null && icon.bundleIdentifier in RUNTIME_ICON_RESOURCES),
+      (icon) =>
+        (options.reset
+          ? resetRuntimeIconResources(icon.appPath, icon.bundleIdentifier!)
+          : applyRuntimeIconResources(icon.appPath, icon.bundleIdentifier!, absolute(icon.styledIconPath))).pipe(
+            Effect.map((files) => [icon.appPath, `${options.reset ? "restored" : "patched"} ${files.length} bundle resource(s)`] as const),
+            Effect.catchAll((e) => Effect.succeed([icon.appPath, e.message] as const))
+          )
+    )
+    const noteFor = new Map(runtimeNotes)
+
+    const results = manifest.icons.map((icon) => {
+      const base = [...finderResults, ...ghosttyResults].find((r) => r.appPath === icon.appPath)
+        ?? { appPath: icon.appPath, applied: false, error: "no result" }
+      const note = noteFor.get(icon.appPath)
+      return note ? { ...base, error: [base.error, note].filter(Boolean).join("; ") } : base
+    })
     yield* Effect.forEach(results, (result, index) =>
       Console.log(
         `[${index + 1}/${results.length}] ${result.applied ? "ok  " : "FAIL"} ${manifest.icons[index]?.name ?? result.appPath}` +

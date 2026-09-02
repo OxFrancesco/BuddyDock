@@ -63,7 +63,7 @@ bun run buddydock reset --manifest styled-icons/manifest.json
 - `style`: styles the icons in an existing scan manifest and masks them into squircles.
 - `run`: scans and styles in one pass.
 - `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip). Ghostty is handled through its native `macos-custom-icon` setting instead (see below), using the manifest directory name as the pack name. Running apps keep drawing their old tile from memory, so pass `--relaunch` to quit and reopen them, or reopen them yourself.
-- `reset`: removes the custom icons for the apps in a styled manifest.
+- `reset`: removes the custom icons for the apps in a styled manifest. Apps that set their own Dock icon at runtime from a bundled image (currently Superhuman) also get that image swapped, with the originals backed up under `~/Library/Application Support/BuddyDock/resource-backups`; app updates revert this, so re-run `apply` afterwards.
 - `reapply`: reapplies a saved `.icns` icon pack via the scripts below (`--sudo` for root-owned apps).
 
 Generated icons include a second manifest recording source paths, theme, and model IDs. BuddyDock processes sequentially to keep cost and rate behavior predictable.
