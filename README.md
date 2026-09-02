@@ -72,6 +72,19 @@ brew install fileicon
 ./scripts/apply-icon-pack.sh ./icon-packs/claymation-black-white
 ```
 
+After linking BuddyDock with `bun link`, reapply the bundled pack from any directory
+with:
+
+```sh
+buddydock reapply
+```
+
+The command applies user-writable apps without prompting and preserves any existing
+custom icon on an app it cannot write, such as a root-owned Tailscale installation.
+Run `buddydock reapply --sudo` from an interactive terminal when a root-owned app has
+lost its custom icon. macOS may require both an administrator password and App
+Management access for that terminal.
+
 The script asks for your administrator password once when targeting `/Applications`.
 It clears incomplete custom-icon metadata, applies each icon, verifies the result,
 touches only the changed apps, and refreshes Finder and Dock once at the end.

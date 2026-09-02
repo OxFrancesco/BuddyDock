@@ -5,6 +5,7 @@ import { BunContext, BunRuntime } from "@effect/platform-bun"
 import { Console, Effect, Option } from "effect"
 import { scanDock } from "./dock.ts"
 import { FalGateway } from "./fal.ts"
+import { defaultIconPackDirectory, reapplyIconPack } from "./icon-pack.ts"
 import { styleManifest } from "./style.ts"
 
 const output = Options.directory("output").pipe(Options.withAlias("o"))
@@ -14,6 +15,15 @@ const theme = Options.text("theme").pipe(Options.withAlias("t"), Options.withDef
 const quality = Options.choice("quality", ["low", "medium", "high"] as const).pipe(Options.withDefault("medium"))
 const keepBackground = Options.boolean("keep-background")
 const limit = Options.integer("limit").pipe(Options.optional)
+const pack = Options.directory("pack").pipe(
+  Options.withAlias("p"),
+  Options.withDefault(defaultIconPackDirectory)
+)
+const applicationsDirectory = Options.directory("applications-directory").pipe(
+  Options.withAlias("a"),
+  Options.withDefault("/Applications")
+)
+const useSudo = Options.boolean("sudo")
 
 const scan = Command.make("scan", { output: scanOutput }, ({ output }) =>
   scanDock(output).pipe(
@@ -65,9 +75,21 @@ const run = Command.make("run", {
   })
 ).pipe(Command.withDescription("Scan the Dock and style its icons in one command"))
 
+const reapply = Command.make("reapply", {
+  pack,
+  applicationsDirectory,
+  useSudo
+}, ({ pack, applicationsDirectory, useSudo }) =>
+  reapplyIconPack({
+    packDirectory: pack,
+    applicationsDirectory,
+    useSudo
+  })
+).pipe(Command.withDescription("Reapply a saved icon pack and refresh the Dock"))
+
 const root = Command.make("buddydock").pipe(
   Command.withDescription("Create cohesive, AI-styled versions of your macOS Dock icons"),
-  Command.withSubcommands([scan, style, run])
+  Command.withSubcommands([scan, style, run, reapply])
 )
 
 const cli = Command.run(root, { name: "BuddyDock", version: "0.1.0" })

@@ -29,7 +29,7 @@ fi
 
 fileicon_bin="$(command -v fileicon)"
 use_sudo=0
-if [[ "$applications_dir" == "/Applications" ]]; then
+if [[ "$applications_dir" == "/Applications" && "${BUDDYDOCK_NO_SUDO:-0}" != "1" ]]; then
   use_sudo=1
   sudo -v
 fi
@@ -107,6 +107,7 @@ declare -a failed_apps=()
 declare -a failed_reasons=()
 declare -a refresh_failures=()
 declare -a native_apps=()
+declare -a preserved_apps=()
 
 for icon_file in "$icons_dir"/*.icns; do
   [[ -e "$icon_file" ]] || continue
@@ -122,6 +123,17 @@ for icon_file in "$icons_dir"/*.icns; do
   apply_method="$(buddy_apply_method_for_app "$pack_manifest" "$app_name")"
   case "$apply_method" in
     fileicon|"")
+      if (( ! use_sudo )) && [[ ! -w "$app_path" ]]; then
+        verification="$($fileicon_bin test "$app_path" 2>&1 || true)"
+        if grep -qi '^HAS custom icon:' <<< "$verification"; then
+          echo "Preserve: $app_name.app is not writable and already has a custom icon"
+          preserved_apps+=("$app_path")
+        else
+          record_failure "$app_path" "application is not writable and has no custom icon"
+        fi
+        continue
+      fi
+
       # Clear half-applied Finder metadata before retrying. fileicon can otherwise
       # leave the custom-icon flag set without its associated Icon\r data.
       if ! remember_fileicon_state "$app_name" "$app_path"; then
@@ -186,7 +198,7 @@ if (( ${#refresh_failures[@]} > 0 )); then
   exit 74
 fi
 
-echo "Applied ${#changed_apps[@]} Finder icons and configured ${#native_apps[@]} native icons from $icons_dir"
+echo "Applied ${#changed_apps[@]} Finder icons, configured ${#native_apps[@]} native icons, and preserved ${#preserved_apps[@]} existing custom icons from $icons_dir"
 if (( ${#native_apps[@]} > 0 )); then
   echo "Restart Ghostty to load its native custom icon."
 fi

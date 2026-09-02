@@ -57,13 +57,9 @@ export class FalGateway extends Context.Tag("buddydock/FalGateway")<FalGateway, 
 
         const finalUrl = request.removeBackground
           ? yield* Effect.tryPromise({
-              try: () => fal.subscribe("fal-ai/birefnet/v2", {
+              try: () => fal.subscribe("fal-ai/ideogram/remove-background", {
                 input: {
-                  image_url: editedUrl,
-                  model: "General Use (Light)",
-                  operating_resolution: "1024x1024",
-                  refine_foreground: true,
-                  output_format: "png"
+                  image_url: editedUrl
                 }
               }),
               catch: (cause) => new FalError({

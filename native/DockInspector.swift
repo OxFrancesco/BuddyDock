@@ -45,8 +45,31 @@ func appURL(from tile: [String: Any]) -> URL? {
     return URL(fileURLWithPath: rawURL)
 }
 
+func bundledIcon(for appURL: URL) -> NSImage? {
+    guard let bundle = Bundle(url: appURL) else { return nil }
+
+    let iconNames = ["CFBundleIconFile", "CFBundleIconName"].compactMap {
+        bundle.object(forInfoDictionaryKey: $0) as? String
+    }
+
+    for iconName in iconNames {
+        let value = iconName as NSString
+        let name = value.deletingPathExtension
+        let fileExtension = value.pathExtension.isEmpty ? "icns" : value.pathExtension
+
+        if
+            let iconURL = bundle.url(forResource: name, withExtension: fileExtension),
+            let image = NSImage(contentsOf: iconURL)
+        {
+            return image
+        }
+    }
+
+    return nil
+}
+
 func exportIcon(for appURL: URL, to destination: URL) throws {
-    let image = NSWorkspace.shared.icon(forFile: appURL.path)
+    let image = bundledIcon(for: appURL) ?? NSWorkspace.shared.icon(forFile: appURL.path)
     image.size = NSSize(width: 1024, height: 1024)
 
     guard

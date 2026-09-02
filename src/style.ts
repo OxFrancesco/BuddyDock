@@ -44,7 +44,7 @@ export const styleManifest = (options: StyleOptions) =>
           styledIconPath,
           theme: options.theme,
           editModel: "openai/gpt-image-2/edit",
-          backgroundModel: options.removeBackground ? "fal-ai/birefnet/v2" : "none"
+          backgroundModel: options.removeBackground ? "fal-ai/ideogram/remove-background" : "none"
         } satisfies StyledIcon
       }), { concurrency: 1 })
 
