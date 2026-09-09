@@ -52,12 +52,43 @@ func hasCompleteCustomIcon(_ appPath: String) -> Bool {
     return read >= 10 && (buffer[8] & 0x04) != 0
 }
 
+func iconPixels(_ image: NSImage) -> Data? {
+    guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 128, pixelsHigh: 128,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 512, bitsPerPixel: 32),
+        let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+    NSGraphicsContext.saveGraphicsState()
+    defer { NSGraphicsContext.restoreGraphicsState() }
+    NSGraphicsContext.current = context
+    image.draw(in: NSRect(x: 0, y: 0, width: 128, height: 128), from: .zero, operation: .copy, fraction: 1)
+    return bitmap.representation(using: .png, properties: [:])
+}
+
+func matchesIcon(_ appPath: String, _ expected: NSImage) -> Bool {
+    guard let pixels = iconPixels(expected), let installed = iconPixels(NSWorkspace.shared.icon(forFile: appPath)) else {
+        return false
+    }
+    return installed == pixels
+}
+
+func iconStatus(_ request: ApplyRequest) -> ApplyResult {
+    guard hasCompleteCustomIcon(request.appPath) else {
+        return result(request.appPath, false, "custom icon missing")
+    }
+    guard let path = request.iconPath else { return result(request.appPath, true) }
+    guard let expected = NSImage(contentsOfFile: path) else {
+        return result(request.appPath, false, "could not load requested icon")
+    }
+    let matches = matchesIcon(request.appPath, expected)
+    return result(request.appPath, matches, matches ? nil : "stored custom icon differs from requested artwork")
+}
+
 func setIcon(_ request: ApplyRequest, reset: Bool, onlyMissing: Bool) -> ApplyResult {
     guard FileManager.default.fileExists(atPath: request.appPath) else {
         return result(request.appPath, false, "App not found")
     }
-    if onlyMissing && !reset && hasCompleteCustomIcon(request.appPath) {
-        return result(request.appPath, true, "custom icon already stored; runtime appearance not checked")
+    if onlyMissing && !reset && iconStatus(request).applied {
+        return result(request.appPath, true, "stored icon matches requested artwork; Dock appearance not checked")
     }
     // A denied write still strips the existing icon, so never attempt one we know will fail.
     guard FileManager.default.isWritableFile(atPath: request.appPath) else {
@@ -81,9 +112,9 @@ func setIcon(_ request: ApplyRequest, reset: Bool, onlyMissing: Bool) -> ApplyRe
         Thread.sleep(forTimeInterval: 0.5)
         ok = NSWorkspace.shared.setIcon(image, forFile: request.appPath, options: [])
     }
-    let verified = reset ? !hasCompleteCustomIcon(request.appPath) : hasCompleteCustomIcon(request.appPath)
+    let verified = reset ? !hasCompleteCustomIcon(request.appPath) : iconStatus(request).applied
     return result(request.appPath, ok && verified,
-        !ok ? "NSWorkspace.setIcon returned false" : !verified ? "Custom icon metadata verification failed" : nil,
+        !ok ? "NSWorkspace.setIcon returned false" : !verified ? "Custom icon artwork verification failed" : nil,
         changed: ok && verified)
 }
 
@@ -132,7 +163,7 @@ do {
     let results = requests.map { request in
         switch CommandLine.arguments[1] {
         case "status":
-            return result(request.appPath, hasCompleteCustomIcon(request.appPath))
+            return iconStatus(request)
         case "relaunch":
             return relaunch(request)
         default:

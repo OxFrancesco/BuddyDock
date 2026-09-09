@@ -135,13 +135,15 @@ export const statusManifest = (manifestPath: string, apps: ReadonlyArray<string>
   Effect.gen(function*() {
     const manifest = yield* readJson(manifestPath, StyledManifest)
     const icons = yield* selectedIcons(manifest.icons, apps)
-    const results = yield* runApplier("status", icons.map((icon) => ({ appPath: icon.appPath, iconPath: null })))
+    const results = yield* runApplier("status", icons.map((icon) => ({
+      appPath: icon.appPath, iconPath: applyMethod(icon) === "finder" ? icon.styledIconPath : null
+    })))
     for (const icon of icons) {
       const result = results.find((entry) => entry.appPath === icon.appPath)!
       const method = applyMethod(icon)
-      const storage = method === "finder" ? result.applied ? "custom icon stored" : "custom icon missing" : `${method} native settings; Finder metadata is not proof of the Dock icon`
+      const storage = method === "finder" ? result.applied ? "stored icon matches requested artwork" : result.error ?? "custom icon missing" : `${method} native settings; Finder metadata is not proof of the Dock icon`
       yield* Console.log(`${icon.name}: ${storage}; ${result.running ? "running" : "not running"}`)
     }
-    yield* Console.log("Status checks stored metadata and running processes. Verify the visible Dock separately.")
+    yield* Console.log("Status compares stored artwork at 128 pixels and checks running processes. Verify the visible Dock separately.")
     return results
   })

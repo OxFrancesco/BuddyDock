@@ -32,6 +32,24 @@ const makeApp = async (name: string, id: string) => {
 
 const icon = new URL("../icon-packs/claymation-black-white/Telegram.icns", import.meta.url).pathname
 
+test("detects and repairs stale artwork even when a complete custom icon exists", async () => {
+  const appPath = await makeApp("Stale Icon", "test.buddydock.stale")
+  const replacement = new URL("../icon-packs/claymation-monochrome-2026-09-09/Helium.icns", import.meta.url).pathname
+  const original = await Effect.runPromise(runApplier("apply", [{ appPath, iconPath: icon }]))
+  expect(original[0]!.applied).toBe(true)
+  const request = [{ appPath, iconPath: replacement }]
+  const stale = await Effect.runPromise(runApplier("status", request))
+  expect(stale[0]!.applied).toBe(false)
+  expect(stale[0]!.error).toContain("differs")
+  const repaired = await Effect.runPromise(runApplier("apply-missing", request))
+  expect(repaired[0]!.applied).toBe(true)
+  expect(repaired[0]!.changed).toBe(true)
+  const current = await Effect.runPromise(runApplier("status", request))
+  expect(current[0]!.applied).toBe(true)
+  const repeated = await Effect.runPromise(runApplier("apply-missing", request))
+  expect(repeated[0]!.changed).toBe(false)
+})
+
 test("imports external art, preserves signed resources, and leaves external Ghostty alone", async () => {
   const app = await makeApp("Example App", "com.superhuman.electron")
   const ghostty = await makeApp("Ghostty", "com.mitchellh.ghostty")

@@ -93,7 +93,7 @@ const run = Command.make("run", {
 const styledManifest = Options.file("manifest").pipe(Options.withAlias("m"), Options.withDefault("styled-icons/manifest.json"))
 const noRestart = Options.boolean("no-restart")
 const relaunch = Options.boolean("relaunch").pipe(Options.withDescription("Quit and reopen only apps explicitly selected with --app; never force-quit"))
-const onlyMissing = Options.boolean("only-missing").pipe(Options.withDescription("Skip apps that already carry a complete custom icon; used by the persist agent"))
+const onlyMissing = Options.boolean("only-missing").pipe(Options.withDescription("Repair missing or stale icons; skip apps whose stored artwork already matches the manifest"))
 
 const summarize = (label: string) => (results: ReadonlyArray<{ applied: boolean }>) =>
   Console.log(`${label} ${results.filter((r) => r.applied).length}/${results.length} app icons`)
