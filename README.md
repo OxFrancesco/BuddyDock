@@ -13,7 +13,7 @@ modifies application bundle contents, and app updates will overwrite custom icon
 
 - macOS with the Swift toolchain
 - [Bun](https://bun.sh)
-- A fal.ai API key exposed as `FAL_KEY` or `FAL_API_KEY`
+- A fal.ai API key exposed as `FAL_KEY` or `FAL_API_KEY` only for the optional provider generation workflow. Importing and applying saved artwork needs no image API key.
 
 ## Setup
 
@@ -120,10 +120,11 @@ Generated icons include a second manifest recording source paths, theme, and mod
 
 ## Claymation icon pack
 
-The repository includes the black-and-white claymation pack in
-`icon-packs/claymation-black-white`. The CLI generates PNGs; the scripts in this
-section convert those PNGs to macOS `.icns` files, apply them, and restore the
-previous custom icons or bundled defaults.
+The default pack is `icon-packs/claymation-monochrome-2026-09-09`. It contains 11
+black-and-white claymation icons recreated with the built-in imagegen tool, including
+Cap. The pack includes PNGs, ten Finder-managed ICNS files, an import mapping, and
+the prompts. Ghostty's PNG is managed through its native settings. The earlier
+`claymation-black-white` pack remains available with `--pack`.
 
 ### Apply the included pack
 
@@ -132,7 +133,7 @@ CLI once, then apply the pack:
 
 ```sh
 brew install fileicon
-./scripts/apply-icon-pack.sh ./icon-packs/claymation-black-white
+buddydock reapply
 ```
 
 After linking BuddyDock with `bun link`, reapply the bundled pack from any directory
@@ -152,18 +153,16 @@ The script asks for your administrator password once when targeting `/Applicatio
 It clears incomplete custom-icon metadata, applies each icon, verifies the result,
 touches only the changed apps, and refreshes Finder and Dock once at the end.
 
-Ghostty is handled through its supported `macos-icon = custom` setting instead of
-`fileicon`. BuddyDock copies the pack icon into Ghostty's Application Support
-directory, remembers the previous Ghostty icon settings, and updates its active
-configuration file. Restart Ghostty after applying or restoring a pack. This is
-necessary because Ghostty controls its running Dock icon through AppKit; a Finder
-custom icon can look correct in `/Applications` but revert when dragged into the
-Dock.
+The default pack leaves Ghostty to its native settings. Set `macos-icon = custom`
+and point `macos-custom-icon` to the absolute path of this pack's `png/04.png`, then
+reload Ghostty with Command+Shift+Comma. BuddyDock does not apply, reset, or persist
+that icon. Older packs marked `ghostty` in their TSV manifest still use BuddyDock's
+native config integration.
 
-Restore the original Finder icons and the previous Ghostty icon settings with:
+Restore the saved Finder icon state with:
 
 ```sh
-./scripts/restore-icon-pack.sh ./icon-packs/claymation-black-white
+./scripts/restore-icon-pack.sh ./icon-packs/claymation-monochrome-2026-09-09
 ```
 
 ### Create a new icon pack

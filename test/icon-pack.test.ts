@@ -3,7 +3,7 @@ import { defaultIconPackDirectory } from "../src/icon-pack.ts"
 
 describe("reapply command", () => {
   test("defaults to the bundled claymation icon pack", async () => {
-    expect(defaultIconPackDirectory).toEndWith("/icon-packs/claymation-black-white")
+    expect(defaultIconPackDirectory).toEndWith("/icon-packs/claymation-monochrome-2026-09-09")
     expect(await Bun.file(`${defaultIconPackDirectory}/manifest.tsv`).exists()).toBe(true)
   })
 

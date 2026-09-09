@@ -13,7 +13,7 @@ export interface ReapplyIconPackOptions {
 const packageRoot = isCompiledApp
   ? resolve(dirname(process.execPath), "../Resources")
   : new URL("..", import.meta.url).pathname
-export const defaultIconPackDirectory = join(packageRoot, "icon-packs/claymation-black-white")
+export const defaultIconPackDirectory = join(packageRoot, "icon-packs/claymation-monochrome-2026-09-09")
 
 export const reapplyIconPack = Effect.fn("IconPack.reapply")(function*(
   options: ReapplyIconPackOptions

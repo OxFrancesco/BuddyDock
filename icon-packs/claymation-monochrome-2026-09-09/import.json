@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "name": "claymation-monochrome-2026-09-09",
+  "icons": [
+    {
+      "appPath": "/Applications/Tailscale.app",
+      "imagePath": "png/01.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Helium.app",
+      "imagePath": "png/02.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Telegram.app",
+      "imagePath": "png/03.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Ghostty.app",
+      "imagePath": "png/04.png",
+      "applyMethod": "external"
+    },
+    {
+      "appPath": "/Applications/Grok Bot.app",
+      "imagePath": "png/05.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Liny.app",
+      "imagePath": "png/06.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/T3 Code (Nightly).app",
+      "imagePath": "png/07.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Beeper Desktop.app",
+      "imagePath": "png/08.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Superhuman.app",
+      "imagePath": "png/09.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Notion Calendar.app",
+      "imagePath": "png/10.png",
+      "applyMethod": "finder"
+    },
+    {
+      "appPath": "/Applications/Cap.app",
+      "imagePath": "png/11.png",
+      "applyMethod": "finder"
+    }
+  ]
+}
