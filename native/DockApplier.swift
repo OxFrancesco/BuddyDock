@@ -12,6 +12,19 @@ struct ApplyResult: Codable {
     let appPath: String
     let applied: Bool
     let error: String?
+    let running: Bool
+    let changed: Bool
+}
+
+func runningApp(_ path: String) -> NSRunningApplication? {
+    let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+    return NSWorkspace.shared.runningApplications.first {
+        $0.bundleURL?.resolvingSymlinksInPath() == url && !$0.isTerminated
+    }
+}
+
+func result(_ path: String, _ applied: Bool, _ error: String? = nil, changed: Bool = false) -> ApplyResult {
+    ApplyResult(appPath: path, applied: applied, error: error, running: runningApp(path) != nil, changed: changed)
 }
 
 enum ApplierError: Error, CustomStringConvertible {
@@ -21,7 +34,7 @@ enum ApplierError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .usage:
-            return "Usage: DockApplier.swift <apply|apply-missing|reset> < requests.json"
+            return "Usage: DockApplier.swift <apply|apply-missing|reset|status|relaunch> < requests.json"
         case .invalidInput:
             return "Expected a JSON array of { appPath, iconPath } objects on stdin"
         }
@@ -41,23 +54,23 @@ func hasCompleteCustomIcon(_ appPath: String) -> Bool {
 
 func setIcon(_ request: ApplyRequest, reset: Bool, onlyMissing: Bool) -> ApplyResult {
     guard FileManager.default.fileExists(atPath: request.appPath) else {
-        return ApplyResult(appPath: request.appPath, applied: false, error: "App not found")
+        return result(request.appPath, false, "App not found")
     }
     if onlyMissing && !reset && hasCompleteCustomIcon(request.appPath) {
-        return ApplyResult(appPath: request.appPath, applied: true, error: "already applied")
+        return result(request.appPath, true, "custom icon already stored; runtime appearance not checked")
     }
     // A denied write still strips the existing icon, so never attempt one we know will fail.
     guard FileManager.default.isWritableFile(atPath: request.appPath) else {
         let owner = (try? FileManager.default.attributesOfItem(atPath: request.appPath)[.ownerAccountName] as? String) ?? "?"
-        return ApplyResult(appPath: request.appPath, applied: false, error: owner == NSUserName()
+        return result(request.appPath, false, owner == NSUserName()
             ? "write denied by macOS App Management; grant it to this process (System Settings > Privacy & Security > App Management)"
-            : "owned by \(owner); re-run with sudo or fix ownership")
+            : "owned by \(owner); use buddydock reapply --sudo from an interactive terminal")
     }
 
     var image: NSImage? = nil
     if !reset {
         guard let iconPath = request.iconPath, let loaded = NSImage(contentsOfFile: iconPath) else {
-            return ApplyResult(appPath: request.appPath, applied: false, error: "Could not load icon \(request.iconPath ?? "<none>")")
+            return result(request.appPath, false, "Could not load icon \(request.iconPath ?? "<none>")")
         }
         image = loaded
     }
@@ -68,11 +81,44 @@ func setIcon(_ request: ApplyRequest, reset: Bool, onlyMissing: Bool) -> ApplyRe
         Thread.sleep(forTimeInterval: 0.5)
         ok = NSWorkspace.shared.setIcon(image, forFile: request.appPath, options: [])
     }
-    return ApplyResult(appPath: request.appPath, applied: ok, error: ok ? nil : "NSWorkspace.setIcon returned false")
+    let verified = reset ? !hasCompleteCustomIcon(request.appPath) : hasCompleteCustomIcon(request.appPath)
+    return result(request.appPath, ok && verified,
+        !ok ? "NSWorkspace.setIcon returned false" : !verified ? "Custom icon metadata verification failed" : nil,
+        changed: ok && verified)
+}
+
+func relaunch(_ request: ApplyRequest) -> ApplyResult {
+    guard let app = runningApp(request.appPath) else {
+        return result(request.appPath, true, "app is not running")
+    }
+    guard app.terminate() else {
+        return result(request.appPath, false, "app declined to quit; left running")
+    }
+    let deadline = Date().addingTimeInterval(10)
+    while !app.isTerminated && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    }
+    guard app.isTerminated else {
+        return result(request.appPath, false, "app did not quit; no forced termination was attempted")
+    }
+    let config = NSWorkspace.OpenConfiguration()
+    config.activates = false
+    var completed = false
+    var failure: String?
+    NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: request.appPath), configuration: config) { _, error in
+        failure = error?.localizedDescription
+        completed = true
+    }
+    let reopenDeadline = Date().addingTimeInterval(10)
+    while !completed && Date() < reopenDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    }
+    return result(request.appPath, completed && failure == nil && runningApp(request.appPath) != nil,
+        failure ?? (completed ? nil : "timed out reopening the app"), changed: completed && failure == nil)
 }
 
 do {
-    guard CommandLine.arguments.count == 2, ["apply", "apply-missing", "reset"].contains(CommandLine.arguments[1]) else {
+    guard CommandLine.arguments.count == 2, ["apply", "apply-missing", "reset", "status", "relaunch"].contains(CommandLine.arguments[1]) else {
         throw ApplierError.usage
     }
     let reset = CommandLine.arguments[1] == "reset"
@@ -83,7 +129,16 @@ do {
         throw ApplierError.invalidInput
     }
 
-    let results = requests.map { setIcon($0, reset: reset, onlyMissing: onlyMissing) }
+    let results = requests.map { request in
+        switch CommandLine.arguments[1] {
+        case "status":
+            return result(request.appPath, hasCompleteCustomIcon(request.appPath))
+        case "relaunch":
+            return relaunch(request)
+        default:
+            return setIcon(request, reset: reset, onlyMissing: onlyMissing)
+        }
+    }
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

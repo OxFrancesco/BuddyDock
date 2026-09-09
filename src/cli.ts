@@ -3,7 +3,8 @@
 import { Command, Options } from "@effect/cli"
 import { BunContext, BunRuntime } from "@effect/platform-bun"
 import { Console, Effect, Option } from "effect"
-import { applyManifest } from "./apply.ts"
+import { applyManifest, requireSuccess, statusManifest } from "./apply.ts"
+import { importIcons } from "./import.ts"
 import { scanDock } from "./dock.ts"
 import { FalGateway } from "./fal.ts"
 import { defaultIconPackDirectory, reapplyIconPack } from "./icon-pack.ts"
@@ -27,6 +28,15 @@ const applicationsDirectory = Options.directory("applications-directory").pipe(
   Options.withDefault("/Applications")
 )
 const useSudo = Options.boolean("sudo")
+const apps = Options.text("app").pipe(Options.repeated, Options.withDescription("Select an exact app name or path; repeat to select multiple apps"))
+
+const importCommand = Command.make("import", {
+  manifest: Options.file("manifest").pipe(Options.withAlias("m")),
+  output
+}, ({ manifest, output }) => importIcons(manifest, output).pipe(
+  Effect.flatMap((result) => Console.log(`Imported ${result.icons.length} existing images into ${output}. No images were generated.\nApply: buddydock apply --manifest ${output}/manifest.json\nCheck: buddydock status --manifest ${output}/manifest.json`)),
+  Effect.asVoid
+)).pipe(Command.withDescription("Package externally generated images for application without calling an image provider"))
 
 const scan = Command.make("scan", { output: scanOutput }, ({ output }) =>
   scanDock(output).pipe(
@@ -82,35 +92,43 @@ const run = Command.make("run", {
 
 const styledManifest = Options.file("manifest").pipe(Options.withAlias("m"), Options.withDefault("styled-icons/manifest.json"))
 const noRestart = Options.boolean("no-restart")
-const relaunch = Options.boolean("relaunch").pipe(Options.withDescription("Quit and reopen running apps so their Dock tile picks up the new icon"))
+const relaunch = Options.boolean("relaunch").pipe(Options.withDescription("Quit and reopen only apps explicitly selected with --app; never force-quit"))
 const onlyMissing = Options.boolean("only-missing").pipe(Options.withDescription("Skip apps that already carry a complete custom icon; used by the persist agent"))
 
 const summarize = (label: string) => (results: ReadonlyArray<{ applied: boolean }>) =>
   Console.log(`${label} ${results.filter((r) => r.applied).length}/${results.length} app icons`)
 
-const apply = Command.make("apply", { manifest: styledManifest, noRestart, relaunch, onlyMissing }, ({ manifest, noRestart, relaunch, onlyMissing }) =>
-  applyManifest({ manifestPath: manifest, reset: false, restartDock: !noRestart, relaunch, onlyMissing }).pipe(
-    Effect.flatMap(summarize("Applied")),
+const apply = Command.make("apply", { manifest: styledManifest, noRestart, relaunch, onlyMissing, apps }, ({ manifest, noRestart, relaunch, onlyMissing, apps }) =>
+  applyManifest({ manifestPath: manifest, reset: false, restartDock: !noRestart, relaunch, onlyMissing, apps }).pipe(
+    Effect.tap(summarize("Stored")),
+    Effect.flatMap(requireSuccess),
     Effect.asVoid
   )
 ).pipe(Command.withDescription("Set the styled icons from a manifest as custom icons on the Dock apps"))
 
-const reset = Command.make("reset", { manifest: styledManifest, noRestart, relaunch }, ({ manifest, noRestart, relaunch }) =>
-  applyManifest({ manifestPath: manifest, reset: true, restartDock: !noRestart, relaunch }).pipe(
-    Effect.flatMap(summarize("Restored")),
+const reset = Command.make("reset", { manifest: styledManifest, noRestart, relaunch, apps }, ({ manifest, noRestart, relaunch, apps }) =>
+  applyManifest({ manifestPath: manifest, reset: true, restartDock: !noRestart, relaunch, apps }).pipe(
+    Effect.tap(summarize("Restored")),
+    Effect.flatMap(requireSuccess),
     Effect.asVoid
   )
 ).pipe(Command.withDescription("Remove custom icons from the apps in a manifest, restoring the originals"))
 
+const status = Command.make("status", { manifest: styledManifest, apps }, ({ manifest, apps }) =>
+  statusManifest(manifest, apps).pipe(Effect.asVoid)
+).pipe(Command.withDescription("Check stored custom icons and running apps without modifying them"))
+
 const reapply = Command.make("reapply", {
   pack,
   applicationsDirectory,
-  useSudo
-}, ({ pack, applicationsDirectory, useSudo }) =>
+  useSudo,
+  apps
+}, ({ pack, applicationsDirectory, useSudo, apps }) =>
   reapplyIconPack({
     packDirectory: pack,
     applicationsDirectory,
-    useSudo
+    useSudo,
+    apps
   })
 ).pipe(Command.withDescription("Reapply a saved icon pack and refresh the Dock"))
 
@@ -128,7 +146,7 @@ const grantAccess = Command.make("grant-access", {}, () => requestAppManagementA
 
 const root = Command.make("buddydock").pipe(
   Command.withDescription("Create cohesive, AI-styled versions of your macOS Dock icons"),
-  Command.withSubcommands([scan, style, run, apply, reset, reapply, persist, unpersist, grantAccess])
+    Command.withSubcommands([scan, style, run, importCommand, apply, reset, status, reapply, persist, unpersist, grantAccess])
 )
 
 const cli = Command.run(root, { name: "BuddyDock", version: "0.1.0" })

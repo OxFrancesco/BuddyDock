@@ -13,6 +13,7 @@ export const DockIcons = Schema.Array(DockIcon)
 export class StyledIcon extends Schema.Class<StyledIcon>("StyledIcon")({
   ...DockIcon.fields,
   styledIconPath: Schema.String,
+  applyMethod: Schema.optional(Schema.Literal("finder", "ghostty", "external")),
   theme: Schema.String,
   editModel: Schema.String,
   backgroundModel: Schema.String
@@ -36,3 +37,13 @@ export const StyledManifest = Schema.Struct({
 })
 
 export type StyledManifest = typeof StyledManifest.Type
+
+export const ImportManifest = Schema.Struct({
+  version: Schema.Literal(1),
+  name: Schema.NonEmptyString,
+  icons: Schema.Array(Schema.Struct({
+    appPath: Schema.NonEmptyString,
+    imagePath: Schema.NonEmptyString,
+    applyMethod: Schema.optional(Schema.Literal("finder", "external"))
+  })).pipe(Schema.minItems(1))
+})

@@ -26,6 +26,51 @@ The build creates `dist/buddydock.js`, the optimized native helpers (`dist/buddy
 
 ## Usage
 
+### Use images made with imagegen or another tool
+
+BuddyDock can import existing artwork without contacting an image provider. Save a mapping file next to your images:
+
+```json
+{
+  "version": 1,
+  "name": "claymation",
+  "icons": [
+    { "appPath": "/Applications/Liny.app", "imagePath": "liny.png" },
+    { "appPath": "/Applications/Ghostty.app", "imagePath": "ghostty.png", "applyMethod": "external" }
+  ]
+}
+```
+
+Relative paths resolve from the mapping file. Import validates every app and image, preserves transparency, packages Finder icons as multi-resolution ICNS files, and publishes the pack only after all files succeed. The output directory must be new.
+
+```sh
+buddydock import --manifest icons.json --output packs/claymation
+buddydock apply --manifest packs/claymation/manifest.json
+buddydock status --manifest packs/claymation/manifest.json
+```
+
+Ghostty imports are always externally managed. Set `macos-icon = custom` and `macos-custom-icon = /absolute/path/to/ghostty.png` in Ghostty's own config, then reload with Command+Shift+Comma. BuddyDock excludes it from application and persistence. A saved config alone does not prove that Ghostty has loaded the image.
+
+An installed Finder icon can differ from a running app's Dock tile. Some apps cache their startup icon; others explicitly replace it. `status` reports stored metadata and whether the app is running, without claiming visual verification. `apply` returns a failure exit code when any requested icon fails.
+
+Refresh only an app that is safe to close:
+
+```sh
+buddydock apply --manifest packs/claymation/manifest.json --app Liny --relaunch
+```
+
+`--relaunch` requires an explicit `--app`. The native helper requests a normal quit, waits for the app to exit, and reopens that exact application path. It never force-quits. Omit `--relaunch` for apps with active sessions. Repeat `--app` to select multiple apps.
+
+For a protected app, run this in an interactive terminal and enter your administrator password there:
+
+```sh
+buddydock reapply --pack packs/claymation --app Tailscale --sudo
+```
+
+An unwritable app with an older custom icon is reported as a failure to install the requested replacement, even when the older icon is preserved.
+
+### Generate with BuddyDock's optional provider workflow
+
 Scan the pinned Dock apps without calling fal:
 
 ```sh
@@ -62,10 +107,12 @@ bun run buddydock reset --manifest styled-icons/manifest.json
 - `scan`: reads `com.apple.dock` and exports each pinned app icon plus `manifest.json`.
 - `style`: styles the icons in an existing scan manifest and masks them into squircles.
 - `run`: scans and styles in one pass.
-- `apply`: sets the styled icons from a styled manifest as custom icons on their apps, then restarts the Dock (`--no-restart` to skip). Ghostty is handled through its native `macos-custom-icon` setting instead (see below), using the manifest directory name as the pack name. Running apps keep drawing their old tile from memory, so pass `--relaunch` to quit and reopen them, or reopen them yourself.
-- `reset`: removes the custom icons for the apps in a styled manifest. Apps that set their own Dock icon at runtime from a bundled image (currently Superhuman) also get that image swapped, with the originals backed up under `~/Library/Application Support/BuddyDock/resource-backups`; app updates revert this, so re-run `apply` afterwards.
+- `import`: validates and packages externally generated images. It never calls fal.ai or generates artwork.
+- `apply`: sets custom Finder icons and refreshes the Dock when an icon changes. `--no-restart` skips the refresh. External entries remain untouched. Legacy Ghostty entries without an external apply method retain the native config handler.
+- `status`: checks custom-icon metadata and running apps without changing them. It does not inspect the visible Dock.
+- `reset`: removes selected custom Finder icons. It never restores or replaces files inside `Contents/Resources`.
 - `reapply`: reapplies a saved `.icns` icon pack via the scripts below (`--sudo` for root-owned apps).
-- `persist`: installs a launchd agent (`ai.buddydock.persist`) that watches `/Applications` and every managed bundle and re-runs `apply --only-missing` with the last applied manifest whenever one changes (apps that already carry a complete custom icon are left untouched, so the agent never writes when nothing is wrong and never triggers itself), so updates do not lose the icons. The agent runs the compiled `dist/BuddyDock.app` (built by `bun run build`), which is what needs App Management access once, otherwise writes are denied. Log: `~/Library/Application Support/BuddyDock/persist.log`.
+- `persist`: installs a launchd agent that restores missing icons after app updates. It runs `apply --only-missing --no-restart`, leaves complete icons alone, and excludes externally managed entries. Successful targeted applies update their entries while preserving other managed apps. The agent runs the compiled `dist/BuddyDock.app`. Log: `~/Library/Application Support/BuddyDock/persist.log`.
 - `unpersist`: removes that agent.
 - `grant-access`: opens System Settings > Privacy & Security > App Management with the `BuddyDock.app` path copied to the clipboard, so you can add it in a few clicks.
 
@@ -95,8 +142,8 @@ with:
 buddydock reapply
 ```
 
-The command applies user-writable apps without prompting and preserves any existing
-custom icon on an app it cannot write, such as a root-owned Tailscale installation.
+The command applies user-writable apps without prompting and reports protected apps
+as failures while preserving their existing icons.
 Run `buddydock reapply --sudo` from an interactive terminal when a root-owned app has
 lost its custom icon. macOS may require both an administrator password and App
 Management access for that terminal.

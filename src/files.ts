@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { ManifestError } from "./errors.ts"
+import { rename, rm } from "node:fs/promises"
 
 // Running from source, import.meta.url points into src/. Running as the compiled
 // BuddyDock.app binary it points into a virtual bundle, so helpers live next to
@@ -24,7 +25,15 @@ export const ensureDirectory = (path: string) =>
 
 export const writeJson = (path: string, value: unknown) =>
   Effect.tryPromise({
-    try: () => Bun.write(path, `${JSON.stringify(value, null, 2)}\n`),
+    try: async () => {
+      const temporary = `${path}.${crypto.randomUUID()}.tmp`
+      try {
+        await Bun.write(temporary, `${JSON.stringify(value, null, 2)}\n`)
+        await rename(temporary, path)
+      } finally {
+        await rm(temporary, { force: true })
+      }
+    },
     catch: (cause) => new ManifestError({ message: `Could not write ${path}`, cause })
   })
 

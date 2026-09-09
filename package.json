@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test ./test",
     "check": "bun run typecheck && bun run test",
-    "build:app": "APP=dist/BuddyDock.app/Contents && mkdir -p $APP/MacOS $APP/Resources && bun build src/cli.ts --compile --outfile $APP/MacOS/BuddyDock && cp dist/buddydock-inspector dist/buddydock-applier dist/buddydock-squircle $APP/MacOS/ && cp native/Info.plist $APP/Info.plist && codesign --force --sign - --identifier ai.buddydock.cli dist/BuddyDock.app"
+    "build:app": "BUDDYDOCK_APP=dist/BuddyDock.app/Contents && mkdir -p $BUDDYDOCK_APP/MacOS $BUDDYDOCK_APP/Resources && bun build src/cli.ts --compile --outfile $BUDDYDOCK_APP/MacOS/BuddyDock && cp dist/buddydock-inspector dist/buddydock-applier dist/buddydock-squircle $BUDDYDOCK_APP/MacOS/ && cp -R scripts icon-packs $BUDDYDOCK_APP/Resources/ && cp native/Info.plist $BUDDYDOCK_APP/Info.plist && codesign --force --sign - --identifier ai.buddydock.cli dist/BuddyDock.app"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -4,7 +4,7 @@ import { isCompiledApp, readJson, writeJson } from "./files.ts"
 import { StyledManifest } from "./model.ts"
 
 // App updaters replace the whole .app bundle, which drops the Finder custom icon
-// and any patched runtime resources. A launchd agent with WatchPaths on
+// A launchd agent with WatchPaths on
 // /Applications and every managed bundle re-runs `apply` whenever they change.
 
 export const AGENT_LABEL = "ai.buddydock.persist"
@@ -18,7 +18,7 @@ const logPath = () => `${stateDirectory()}/persist.log`
 const fail = (message: string) => (cause: unknown) => new DockApplyError({ message, cause })
 
 // The copy stores absolute icon paths because the agent runs without our cwd.
-export const rememberActiveManifest = (manifestPath: string) =>
+export const rememberActiveManifest = (manifestPath: string, successfulApps?: ReadonlyArray<string>) =>
   Effect.gen(function*() {
     const manifest = yield* readJson(manifestPath, StyledManifest)
     const absolute = (path: string) => path.startsWith("/") ? path : `${process.cwd()}/${path}`
@@ -26,15 +26,24 @@ export const rememberActiveManifest = (manifestPath: string) =>
       try: () => Bun.$`mkdir -p ${stateDirectory()}`.quiet(),
       catch: fail("Could not create the BuddyDock state directory")
     })
-    yield* writeJson(activeManifestPath(), {
+    const existing = (yield* Effect.promise(() => Bun.file(activeManifestPath()).exists()))
+      ? yield* readJson(activeManifestPath(), StyledManifest)
+      : { ...manifest, icons: [] }
+    const external = new Set(manifest.icons.filter((icon) => icon.applyMethod === "external").map((icon) => icon.appPath))
+    const updated = manifest.icons.filter((icon) => icon.applyMethod !== "external" && (!successfulApps || successfulApps.includes(icon.appPath)))
+    const replacementPaths = new Set(updated.map((icon) => icon.appPath))
+    const retained = existing.icons.filter((icon) => !external.has(icon.appPath) && !replacementPaths.has(icon.appPath))
+    const next = {
       ...manifest,
-      icons: manifest.icons.map((icon) => ({ ...icon, iconPath: absolute(icon.iconPath), styledIconPath: absolute(icon.styledIconPath) }))
-    })
+      icons: [...retained, ...updated.map((icon) => ({ ...icon, iconPath: absolute(icon.iconPath), styledIconPath: absolute(icon.styledIconPath) }))]
+    }
+    if (JSON.stringify(existing.icons) !== JSON.stringify(next.icons)) yield* writeJson(activeManifestPath(), next)
   })
 
-export const forgetActiveManifest = Effect.tryPromise({
-  try: () => Bun.$`rm -f ${activeManifestPath()}`.quiet(),
-  catch: fail("Could not clear the active manifest")
+export const forgetActiveManifest = (appPaths: ReadonlyArray<string>) => Effect.gen(function*() {
+  if (!(yield* Effect.promise(() => Bun.file(activeManifestPath()).exists()))) return
+  const active = yield* readJson(activeManifestPath(), StyledManifest)
+  yield* writeJson(activeManifestPath(), { ...active, icons: active.icons.filter((icon) => !appPaths.includes(icon.appPath)) })
 })
 
 const xml = (value: string) =>
@@ -56,6 +65,7 @@ export const agentPlist = (options: {
     <string>--manifest</string>
     <string>${xml(options.manifest)}</string>
     <string>--only-missing</string>
+    <string>--no-restart</string>
   </array>
   <key>WatchPaths</key>
   <array>

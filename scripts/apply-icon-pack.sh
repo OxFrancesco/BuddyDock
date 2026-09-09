@@ -28,6 +28,16 @@ if ! compgen -G "$icons_dir/*.icns" >/dev/null; then
 fi
 
 fileicon_bin="$(command -v fileicon)"
+attempt_state_dir="$(mktemp -d)"
+trap 'rm -rf "$attempt_state_dir"' EXIT
+if [[ -n "${BUDDYDOCK_APPS:-}" ]]; then
+  while IFS= read -r selected_app; do
+    if [[ ! -f "$icons_dir/$selected_app.icns" ]]; then
+      echo "No icon in this pack for: $selected_app" >&2
+      exit 66
+    fi
+  done <<< "$BUDDYDOCK_APPS"
+fi
 use_sudo=0
 if [[ "$applications_dir" == "/Applications" && "${BUDDYDOCK_NO_SUDO:-0}" != "1" ]]; then
   use_sudo=1
@@ -113,6 +123,12 @@ for icon_file in "$icons_dir"/*.icns; do
   [[ -e "$icon_file" ]] || continue
 
   app_name="$(basename "$icon_file" .icns)"
+  if [[ -n "${BUDDYDOCK_APPS:-}" ]]; then
+    case $'\n'"$BUDDYDOCK_APPS"$'\n' in
+      *$'\n'"$app_name"$'\n'*) ;;
+      *) continue ;;
+    esac
+  fi
   app_path="$applications_dir/$app_name.app"
 
   if [[ ! -d "$app_path" ]]; then
@@ -126,8 +142,7 @@ for icon_file in "$icons_dir"/*.icns; do
       if (( ! use_sudo )) && [[ ! -w "$app_path" ]]; then
         verification="$($fileicon_bin test "$app_path" 2>&1 || true)"
         if grep -qi '^HAS custom icon:' <<< "$verification"; then
-          echo "Preserve: $app_name.app is not writable and already has a custom icon"
-          preserved_apps+=("$app_path")
+          record_failure "$app_path" "application is not writable; existing custom icon preserved, requested replacement not installed"
         else
           record_failure "$app_path" "application is not writable and has no custom icon"
         fi
@@ -139,6 +154,14 @@ for icon_file in "$icons_dir"/*.icns; do
       if ! remember_fileicon_state "$app_name" "$app_path"; then
         record_failure "$app_path" "could not back up the existing custom icon"
         continue
+      fi
+      attempt_icon="$attempt_state_dir/$app_name.icns"
+      verification="$($fileicon_bin test "$app_path" 2>&1 || true)"
+      if grep -qi '^HAS custom icon:' <<< "$verification"; then
+        if ! "$fileicon_bin" get -f "$app_path" "$attempt_icon" >/dev/null; then
+          record_failure "$app_path" "could not preserve the current custom icon"
+          continue
+        fi
       fi
       run_mutation "$fileicon_bin" rm "$app_path" >/dev/null 2>&1 || true
       if run_mutation "$fileicon_bin" set "$app_path" "$icon_file"; then
@@ -152,6 +175,9 @@ for icon_file in "$icons_dir"/*.icns; do
         fi
       else
         record_failure "$app_path" "fileicon could not modify the application"
+      fi
+      if (( ${#failed_apps[@]} > 0 )) && [[ "${failed_apps[${#failed_apps[@]}-1]}" == "$app_path" ]] && [[ -f "$attempt_icon" ]]; then
+        run_mutation "$fileicon_bin" set "$app_path" "$attempt_icon" >/dev/null 2>&1 || true
       fi
       ;;
     ghostty)
@@ -175,7 +201,7 @@ if (( ${#changed_apps[@]} > 0 )); then
   done
 fi
 
-if [[ "${BUDDYDOCK_NO_REFRESH:-0}" != "1" ]]; then
+if [[ "${BUDDYDOCK_NO_REFRESH:-0}" != "1" ]] && (( ${#changed_apps[@]} > 0 || ${#native_apps[@]} > 0 )); then
   killall Finder 2>/dev/null || true
   killall Dock 2>/dev/null || true
 fi
@@ -199,6 +225,7 @@ if (( ${#refresh_failures[@]} > 0 )); then
 fi
 
 echo "Applied ${#changed_apps[@]} Finder icons, configured ${#native_apps[@]} native icons, and preserved ${#preserved_apps[@]} existing custom icons from $icons_dir"
+echo "Stored icons were verified. Running apps may still display a cached or runtime-supplied icon."
 if (( ${#native_apps[@]} > 0 )); then
   echo "Restart Ghostty to load its native custom icon."
 fi
